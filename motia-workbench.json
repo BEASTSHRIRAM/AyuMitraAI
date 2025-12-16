@@ -1,0 +1,77 @@
+[
+  {
+    "id": "hello-world-flow",
+    "config": {
+      "src\\hello\\log-greeting.step.js": {
+        "x": 700,
+        "y": 44
+      },
+      "src\\hello\\hello-api.step.ts": {
+        "x": -95,
+        "y": 9
+      },
+      "src\\hello\\process_greeting_step.py": {
+        "x": 306,
+        "y": 50
+      }
+    }
+  },
+  {
+    "id": "authentication",
+    "config": {
+      "src\\api\\auth-register.step.ts": {
+        "x": -229,
+        "y": -49
+      },
+      "src\\.motia\\compiled\\api\\auth-register.step.js": {
+        "x": -234,
+        "y": 260
+      },
+      "src\\events\\user-registered.step.ts": {
+        "x": 161,
+        "y": -54
+      },
+      "src\\.motia\\compiled\\events\\user-registered.step.js": {
+        "x": 240,
+        "y": 227
+      },
+      "src\\events\\send-welcome-email.step.ts": {
+        "x": 695,
+        "y": 14
+      },
+      "src\\.motia\\compiled\\events\\send-welcome-email.step.js": {
+        "x": 792,
+        "y": 234
+      }
+    }
+  },
+  {
+    "id": "symptom-analysis",
+    "config": {
+      "src\\api\\analyze-symptoms.step.ts": {
+        "x": -65,
+        "y": -13
+      },
+      "src\\.motia\\compiled\\api\\analyze-symptoms.step.js": {
+        "x": 0,
+        "y": 223
+      },
+      "src\\events\\symptom-analyzed.step.ts": {
+        "x": 350,
+        "y": 34
+      },
+      "src\\.motia\\compiled\\events\\symptom-analyzed.step.js": {
+        "x": 350,
+        "y": 257
+      },
+      "src\\events\\find-matching-doctors.step.ts": {
+        "x": 709,
+        "y": 7
+      },
+      "src\\.motia\\compiled\\events\\find-matching-doctors.step.js": {
+        "x": 752,
+        "y": 257
+      }
+    }
+  }
+]

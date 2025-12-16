@@ -79,5 +79,10 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
+# Motia
+.motia/
+.mermaid/
+types.d.ts
+
 # Mobile development
 android-sdk/ 
