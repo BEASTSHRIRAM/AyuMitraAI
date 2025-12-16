@@ -13,10 +13,6 @@ from config import get_settings
 
 settings = get_settings()
 
-# =====================================================================
-# TOOL DEFINITIONS FOR AGENTS
-# ============================================================================
-
 @tool
 def analyze_symptom_severity(symptoms: str, patient_age: int = None) -> dict:
     """
