@@ -20,7 +20,12 @@ const Signup = () => {
     specialization: '',
     experience_years: '',
     license_number: '',
-    phone: ''
+    phone: '',
+    clinic_name: '',
+    clinic_address: '',
+    hospital_name: '',
+    hospital_address: '',
+    bed_count: ''
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -44,6 +49,29 @@ const Signup = () => {
           phone: formData.phone
         };
         response = await api.post('/auth/register-doctor', doctorData);
+      } else if (formData.role === 'clinic_admin') {
+        const clinicData = {
+          email: formData.email,
+          password: formData.password,
+          full_name: formData.full_name,
+          clinic_name: formData.clinic_name,
+          clinic_address: formData.clinic_address,
+          phone: formData.phone,
+          license_number: formData.license_number
+        };
+        response = await api.post('/auth/register-clinic', clinicData);
+      } else if (formData.role === 'hospital_admin') {
+        const hospitalData = {
+          email: formData.email,
+          password: formData.password,
+          full_name: formData.full_name,
+          hospital_name: formData.hospital_name,
+          hospital_address: formData.hospital_address,
+          phone: formData.phone,
+          license_number: formData.license_number,
+          bed_count: parseInt(formData.bed_count)
+        };
+        response = await api.post('/auth/register-hospital', hospitalData);
       } else {
         const userData = {
           email: formData.email,
@@ -68,7 +96,7 @@ const Signup = () => {
         navigate('/dashboard');
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      toast.error(error.response?.data?.error || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -188,6 +216,236 @@ const Signup = () => {
                       value={formData.license_number}
                       onChange={(e) => setFormData({...formData, license_number: e.target.value})}
                       placeholder="MED12345"
+                      required
+                      className="h-12 rounded-lg transition-all duration-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+1234567890"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+              </>
+            )}
+
+            {formData.role === 'clinic_admin' && (
+              <>
+                <div>
+                  <Label htmlFor="clinic_name">Clinic Name</Label>
+                  <Input
+                    id="clinic_name"
+                    value={formData.clinic_name}
+                    onChange={(e) => setFormData({...formData, clinic_name: e.target.value})}
+                    placeholder="Your Clinic Name"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="clinic_address">Clinic Address</Label>
+                  <Input
+                    id="clinic_address"
+                    value={formData.clinic_address}
+                    onChange={(e) => setFormData({...formData, clinic_address: e.target.value})}
+                    placeholder="123 Medical Street, City"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="license_number">License Number</Label>
+                  <Input
+                    id="license_number"
+                    value={formData.license_number}
+                    onChange={(e) => setFormData({...formData, license_number: e.target.value})}
+                    placeholder="LIC12345"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+1234567890"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+              </>
+            )}
+
+            {formData.role === 'hospital_admin' && (
+              <>
+                <div>
+                  <Label htmlFor="hospital_name">Hospital Name</Label>
+                  <Input
+                    id="hospital_name"
+                    value={formData.hospital_name}
+                    onChange={(e) => setFormData({...formData, hospital_name: e.target.value})}
+                    placeholder="Your Hospital Name"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="hospital_address">Hospital Address</Label>
+                  <Input
+                    id="hospital_address"
+                    value={formData.hospital_address}
+                    onChange={(e) => setFormData({...formData, hospital_address: e.target.value})}
+                    placeholder="456 Hospital Avenue, City"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="bed_count">Bed Count</Label>
+                    <Input
+                      id="bed_count"
+                      type="number"
+                      value={formData.bed_count}
+                      onChange={(e) => setFormData({...formData, bed_count: e.target.value})}
+                      placeholder="100"
+                      required
+                      min="1"
+                      className="h-12 rounded-lg transition-all duration-500"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="license_number">License Number</Label>
+                    <Input
+                      id="license_number"
+                      value={formData.license_number}
+                      onChange={(e) => setFormData({...formData, license_number: e.target.value})}
+                      placeholder="HOSP12345"
+                      required
+                      className="h-12 rounded-lg transition-all duration-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+1234567890"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+              </>
+            )}
+
+            {formData.role === 'clinic_admin' && (
+              <>
+                <div>
+                  <Label htmlFor="clinic_name">Clinic Name</Label>
+                  <Input
+                    id="clinic_name"
+                    value={formData.clinic_name}
+                    onChange={(e) => setFormData({...formData, clinic_name: e.target.value})}
+                    placeholder="Your Clinic Name"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="clinic_address">Clinic Address</Label>
+                  <Input
+                    id="clinic_address"
+                    value={formData.clinic_address}
+                    onChange={(e) => setFormData({...formData, clinic_address: e.target.value})}
+                    placeholder="123 Medical Street"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="license_number">License Number</Label>
+                  <Input
+                    id="license_number"
+                    value={formData.license_number}
+                    onChange={(e) => setFormData({...formData, license_number: e.target.value})}
+                    placeholder="LIC12345"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+1234567890"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+              </>
+            )}
+
+            {formData.role === 'hospital_admin' && (
+              <>
+                <div>
+                  <Label htmlFor="hospital_name">Hospital Name</Label>
+                  <Input
+                    id="hospital_name"
+                    value={formData.hospital_name}
+                    onChange={(e) => setFormData({...formData, hospital_name: e.target.value})}
+                    placeholder="Your Hospital Name"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="hospital_address">Hospital Address</Label>
+                  <Input
+                    id="hospital_address"
+                    value={formData.hospital_address}
+                    onChange={(e) => setFormData({...formData, hospital_address: e.target.value})}
+                    placeholder="456 Hospital Avenue"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="bed_count">Bed Count</Label>
+                    <Input
+                      id="bed_count"
+                      type="number"
+                      value={formData.bed_count}
+                      onChange={(e) => setFormData({...formData, bed_count: e.target.value})}
+                      placeholder="100"
+                      required
+                      min="1"
+                      className="h-12 rounded-lg transition-all duration-500"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="license_number">License Number</Label>
+                    <Input
+                      id="license_number"
+                      value={formData.license_number}
+                      onChange={(e) => setFormData({...formData, license_number: e.target.value})}
+                      placeholder="HOSP12345"
                       required
                       className="h-12 rounded-lg transition-all duration-500"
                     />

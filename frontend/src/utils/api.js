@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { getToken, clearAuth } from './auth';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
 console.log('API_BASE_URL:', API_BASE_URL);
 
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

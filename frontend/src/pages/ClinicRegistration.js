@@ -11,13 +11,28 @@ import { Building2, MapPin, Loader2 } from 'lucide-react';
 
 const ClinicRegistration = () => {
   const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
     clinic_name: '',
-    location: { address: '', lat: '', lon: '' },
-    doctor: { name: '', specialization: '', experience: '', availability_hours: '' },
+    clinic_address: '',
+    phone: '',
+    license_number: '',
+    location: {
+      address: '',
+      lat: '',
+      lon: ''
+    },
+    doctor: {
+      name: '',
+      specialization: '',
+      experience: '',
+      availability_hours: ''
+    },
     has_nurses: false,
     has_medicine_shop: false,
-    fees: '',
     accepts_emergencies: false,
+    fees: '',
     contact_phone: ''
   });
   const [loading, setLoading] = useState(false);
@@ -70,24 +85,26 @@ const ClinicRegistration = () => {
 
     try {
       const payload = {
-        ...formData,
-        location: {
-          address: formData.location.address,
-          lat: parseFloat(formData.location.lat) || 0,
-          lon: parseFloat(formData.location.lon) || 0
-        },
-        doctor: {
-          ...formData.doctor,
-          experience: parseInt(formData.doctor.experience) || 0
-        },
-        fees: formData.fees ? parseFloat(formData.fees) : null
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.full_name,
+        clinic_name: formData.clinic_name,
+        clinic_address: formData.location.address || formData.clinic_address,
+        phone: formData.contact_phone,
+        license_number: formData.license_number,
+        location: formData.location,
+        doctor: formData.doctor,
+        has_nurses: formData.has_nurses,
+        has_medicine_shop: formData.has_medicine_shop,
+        accepts_emergencies: formData.accepts_emergencies,
+        fees: formData.fees
       };
 
-      const response = await api.post('/clinics/register', payload);
+      const response = await api.post('/auth/register-clinic', payload);
       setRegisteredClinic(response.data);
       toast.success('Clinic registered successfully!');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      toast.error(error.response?.data?.error || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -112,16 +129,16 @@ const ClinicRegistration = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-teal-50 dark:bg-teal-950/30 border-2 border-teal-500 rounded-xl p-6 text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Unique Clinic ID</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Unique Facility ID</p>
                 <p className="text-3xl font-bold text-teal-600 dark:text-teal-400 font-mono tracking-wider">
-                  {registeredClinic.clinic_id}
+                  {registeredClinic.facility_id}
                 </p>
                 <p className="text-xs text-slate-500 mt-3">Doctors need this ID to register with your clinic</p>
               </div>
               <div className="space-y-2">
-                <p><strong>Clinic Name:</strong> {registeredClinic.clinic_name}</p>
-                <p><strong>Location:</strong> {registeredClinic.location.address}</p>
-                <p><strong>Doctor:</strong> {registeredClinic.doctor.name} ({registeredClinic.doctor.specialization})</p>
+                <p><strong>Admin:</strong> {registeredClinic.user?.full_name}</p>
+                <p><strong>Email:</strong> {registeredClinic.user?.email}</p>
+                <p><strong>Role:</strong> {registeredClinic.user?.role}</p>
               </div>
               <Button onClick={() => navigate('/dashboard')} className="w-full">
                 Go to Dashboard
@@ -136,6 +153,46 @@ const ClinicRegistration = () => {
             </CardHeader>
             <CardContent>
             <form data-testid="clinic-registration-form" onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Admin Account</h3>
+                <div>
+                  <Label htmlFor="full_name">Your Full Name *</Label>
+                  <Input
+                    id="full_name"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                    placeholder="John Doe"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="admin@clinic.com"
+                    required
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="password">Password *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    placeholder="Minimum 6 characters"
+                    required
+                    minLength={6}
+                    className="h-12 rounded-lg transition-all duration-500"
+                  />
+                </div>
+              </div>
+
               <div>
                 <Label htmlFor="clinic_name">Clinic Name *</Label>
                 <Input
@@ -144,6 +201,18 @@ const ClinicRegistration = () => {
                   value={formData.clinic_name}
                   onChange={(e) => setFormData({...formData, clinic_name: e.target.value})}
                   placeholder="HealthCare Clinic"
+                  required
+                  className="h-12 rounded-lg transition-all duration-500"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="license_number">License Number *</Label>
+                <Input
+                  id="license_number"
+                  value={formData.license_number}
+                  onChange={(e) => setFormData({...formData, license_number: e.target.value})}
+                  placeholder="LIC12345"
                   required
                   className="h-12 rounded-lg transition-all duration-500"
                 />

@@ -25,20 +25,38 @@ const PatientDashboard = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/connect-with-doctor', {
+      // First, get nearby doctors based on symptoms
+      const doctorsResponse = await api.post('/doctors/nearby', {
+        limit: 10
+      });
+      
+      const nearbyDoctors = doctorsResponse.data.doctors;
+      
+      if (nearbyDoctors.length === 0) {
+        toast.error('No doctors available at the moment');
+        setLoading(false);
+        return;
+      }
+
+      // For now, connect with the first available doctor
+      // In a real app, you'd let the patient choose
+      const selectedDoctor = nearbyDoctors[0];
+      
+      const response = await api.post('/patient/connect-with-doctor', {
+        doctor_id: selectedDoctor.doctor_id,
         symptom_description: symptomDescription,
         patient_age: patientAge ? parseInt(patientAge) : null
       });
       
       setRequestId(response.data.request_id);
-      setMatchedDoctors(response.data.matching_doctors);
+      setMatchedDoctors(nearbyDoctors);
       setConnectionStatus(response.data.status);
-      toast.success(`Connected with ${response.data.matching_doctors.length} doctors!`);
+      toast.success(`Request sent to Dr. ${selectedDoctor.full_name}!`);
       
       // Start polling for doctor response
       pollForDoctorResponse(response.data.request_id);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Connection failed');
+      toast.error(error.response?.data?.error || 'Connection failed');
     } finally {
       setLoading(false);
     }
@@ -47,13 +65,9 @@ const PatientDashboard = () => {
   const pollForDoctorResponse = async (reqId) => {
     const pollInterval = setInterval(async () => {
       try {
-        const response = await api.get(`/patient/request-status/${reqId}`);
-        
-        if (response.data.assigned_doctor) {
-          clearInterval(pollInterval);
-          setConnectionStatus('accepted');
-          toast.success(`Dr. ${response.data.assigned_doctor.name} has accepted your request!`);
-        }
+        // TODO: Create an API endpoint to check request status
+        // For now, just poll the state
+        console.log('Polling for doctor response on request:', reqId);
       } catch (error) {
         console.error('Polling error:', error);
       }

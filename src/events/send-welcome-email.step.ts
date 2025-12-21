@@ -1,13 +1,16 @@
 import type { EventConfig, Handlers } from 'motia';
 import { z } from 'zod';
-import sgMail from '@sendgrid/mail';
+import FormData from 'form-data';
+import Mailgun from 'mailgun.js';
 
-// Initialize SendGrid with API key from environment
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY;
+const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@ayumitra.ai';
 
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
+let mailgun: any = null;
+if (MAILGUN_API_KEY && MAILGUN_DOMAIN) {
+  const mg = new Mailgun(FormData);
+  mailgun = mg.client({ username: 'api', key: MAILGUN_API_KEY });
 }
 
 const welcomeEmailSchema = z.object({
@@ -21,7 +24,7 @@ const welcomeEmailSchema = z.object({
 export const config: EventConfig = {
   name: 'SendWelcomeEmail',
   type: 'event',
-  description: 'Sends welcome email to newly registered users',
+  description: 'Sends welcome email to newly registered users via Mailgun',
   subscribes: ['send-welcome-email'],
   emits: [],
   input: welcomeEmailSchema,
@@ -32,18 +35,16 @@ export const handler: Handlers['SendWelcomeEmail'] = async (input, { logger }) =
   try {
     const { user_id, email, full_name, role } = input;
 
-    logger.info('Sending welcome email', { email, user_id, role });
+    logger.info('Sending welcome email', { email, user_id });
 
-    // If SendGrid is not configured, just log (development mode)
-    if (!SENDGRID_API_KEY) {
-      logger.warn('SendGrid not configured - email not sent (development mode)', {
+    if (!mailgun || !MAILGUN_DOMAIN) {
+      logger.warn('Mailgun not configured - email not sent (development mode)', {
         email,
         user_id
       });
       return;
     }
 
-    // Create HTML email content
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -80,10 +81,10 @@ export const handler: Handlers['SendWelcomeEmail'] = async (input, { logger }) =
       </html>
     `;
 
-    // Send email via SendGrid
-    await sgMail.send({
-      to: email,
+    // Send via Mailgun
+    await mailgun.messages.create(MAILGUN_DOMAIN, {
       from: FROM_EMAIL,
+      to: email,
       subject: 'Welcome to AyuMitraAI - Your Account is Ready!',
       html: htmlContent,
       text: `Welcome to AyuMitraAI, ${full_name}!\n\nYour account has been created as a ${role}.\n\nGet started by logging in to your dashboard.\n\nBest regards,\nAyuMitraAI Team`
@@ -95,6 +96,6 @@ export const handler: Handlers['SendWelcomeEmail'] = async (input, { logger }) =
       email: input.email,
       error: error instanceof Error ? error.message : String(error)
     });
-    throw error; // Motia will retry automatically
+    throw error;
   }
 };

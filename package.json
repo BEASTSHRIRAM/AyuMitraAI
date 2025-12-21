@@ -21,6 +21,8 @@
     "@motiadev/plugin-logs": "^0.17.8-beta.190",
     "@motiadev/plugin-observability": "^0.17.8-beta.190",
     "@motiadev/plugin-states": "^0.17.8-beta.190",
+    "form-data": "^4.0.0",
+    "mailgun.js": "^12.4.0",
     "motia": "^0.17.8-beta.190",
     "zod": "^4.1.12"
   },
