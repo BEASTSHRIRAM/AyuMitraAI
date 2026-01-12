@@ -104,70 +104,70 @@ const ClinicRegistration = () => {
       setRegisteredClinic(response.data);
       toast.success('Clinic registered successfully!');
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Registration failed');
+      toast.error(error.response?.data?.detail || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div data-testid="clinic-registration-page" className="min-h-screen py-12 px-6 transition-colors duration-500">
+    <div data-testid="clinic-registration-page" className="min-h-screen py-6 sm:py-12 px-4 sm:px-6 transition-colors duration-500">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-teal-500 to-sky-500 mb-4">
-            <Building2 className="w-8 h-8 text-white" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-teal-500 to-sky-500 mb-3 sm:mb-4">
+            <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold mb-2 text-slate-900 dark:text-slate-100 transition-colors duration-500" style={{ fontFamily: 'Manrope, sans-serif' }}>Register Your Clinic</h1>
-          <p className="text-slate-600 dark:text-slate-400 transition-colors duration-500">Join the AyuMitraAI network and receive AI-matched patient referrals</p>
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2 text-slate-900 dark:text-slate-100 transition-colors duration-500" style={{ fontFamily: 'Manrope, sans-serif' }}>Register Your Clinic</h1>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 transition-colors duration-500">Join the AyuMitraAI network and receive AI-matched patient referrals</p>
         </div>
 
         {registeredClinic ? (
           <Card className="transition-colors duration-500">
-            <CardHeader>
-              <CardTitle className="text-green-600 dark:text-green-400">✓ Clinic Registered Successfully!</CardTitle>
-              <CardDescription>Share this unique ID with doctors for registration</CardDescription>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-green-600 dark:text-green-400 text-lg sm:text-xl">✓ Clinic Registered Successfully!</CardTitle>
+              <CardDescription className="text-sm">Share this unique ID with doctors for registration</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-teal-50 dark:bg-teal-950/30 border-2 border-teal-500 rounded-xl p-6 text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Unique Facility ID</p>
-                <p className="text-3xl font-bold text-teal-600 dark:text-teal-400 font-mono tracking-wider">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
+              <div className="bg-teal-50 dark:bg-teal-950/30 border-2 border-teal-500 rounded-xl p-4 sm:p-6 text-center">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2">Unique Facility ID</p>
+                <p className="text-xl sm:text-3xl font-bold text-teal-600 dark:text-teal-400 font-mono tracking-wider break-all">
                   {registeredClinic.facility_id}
                 </p>
-                <p className="text-xs text-slate-500 mt-3">Doctors need this ID to register with your clinic</p>
+                <p className="text-xs text-slate-500 mt-2 sm:mt-3">Doctors need this ID to register with your clinic</p>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 text-sm">
                 <p><strong>Admin:</strong> {registeredClinic.user?.full_name}</p>
                 <p><strong>Email:</strong> {registeredClinic.user?.email}</p>
                 <p><strong>Role:</strong> {registeredClinic.user?.role}</p>
               </div>
-              <Button onClick={() => navigate('/dashboard')} className="w-full">
+              <Button onClick={() => navigate('/dashboard')} className="w-full py-5 sm:py-6">
                 Go to Dashboard
               </Button>
             </CardContent>
           </Card>
         ) : (
           <Card className="transition-colors duration-500">
-            <CardHeader>
-              <CardTitle>Clinic Information</CardTitle>
-              <CardDescription>Provide details about your clinic and services</CardDescription>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-lg sm:text-xl">Clinic Information</CardTitle>
+              <CardDescription className="text-sm">Provide details about your clinic and services</CardDescription>
             </CardHeader>
-            <CardContent>
-            <form data-testid="clinic-registration-form" onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Admin Account</h3>
+            <CardContent className="px-4 sm:px-6">
+            <form data-testid="clinic-registration-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="font-semibold text-base sm:text-lg">Admin Account</h3>
                 <div>
-                  <Label htmlFor="full_name">Your Full Name *</Label>
+                  <Label htmlFor="full_name" className="text-sm">Your Full Name *</Label>
                   <Input
                     id="full_name"
                     value={formData.full_name}
                     onChange={(e) => setFormData({...formData, full_name: e.target.value})}
                     placeholder="John Doe"
                     required
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email" className="text-sm">Email *</Label>
                   <Input
                     id="email"
                     type="email"
@@ -175,11 +175,11 @@ const ClinicRegistration = () => {
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     placeholder="admin@clinic.com"
                     required
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="password">Password *</Label>
+                  <Label htmlFor="password" className="text-sm">Password *</Label>
                   <Input
                     id="password"
                     type="password"
@@ -188,13 +188,13 @@ const ClinicRegistration = () => {
                     placeholder="Minimum 6 characters"
                     required
                     minLength={6}
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="clinic_name">Clinic Name *</Label>
+                <Label htmlFor="clinic_name" className="text-sm">Clinic Name *</Label>
                 <Input
                   data-testid="clinic-name-input"
                   id="clinic_name"
@@ -202,33 +202,33 @@ const ClinicRegistration = () => {
                   onChange={(e) => setFormData({...formData, clinic_name: e.target.value})}
                   placeholder="HealthCare Clinic"
                   required
-                  className="h-12 rounded-lg transition-all duration-500"
+                  className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                 />
               </div>
 
               <div>
-                <Label htmlFor="license_number">License Number *</Label>
+                <Label htmlFor="license_number" className="text-sm">License Number *</Label>
                 <Input
                   id="license_number"
                   value={formData.license_number}
                   onChange={(e) => setFormData({...formData, license_number: e.target.value})}
                   placeholder="LIC12345"
                   required
-                  className="h-12 rounded-lg transition-all duration-500"
+                  className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                 />
               </div>
 
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Location</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="font-semibold text-base sm:text-lg">Location</h3>
                 <Input
                   data-testid="clinic-address-input"
                   placeholder="Address *"
                   value={formData.location.address}
                   onChange={(e) => setFormData({...formData, location: {...formData.location, address: e.target.value}})}
                   required
-                  className="h-12 rounded-lg transition-all duration-500"
+                  className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-4">
                   <div>
                     <Input
                       data-testid="clinic-lat-input"
@@ -237,7 +237,7 @@ const ClinicRegistration = () => {
                       placeholder="Latitude"
                       value={formData.location.lat}
                       onChange={(e) => setFormData({...formData, location: {...formData.location, lat: e.target.value}})}
-                      className="h-12 rounded-lg transition-all duration-500"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                     />
                   </div>
                   <div>
@@ -248,7 +248,7 @@ const ClinicRegistration = () => {
                       placeholder="Longitude"
                       value={formData.location.lon}
                       onChange={(e) => setFormData({...formData, location: {...formData.location, lon: e.target.value}})}
-                      className="h-12 rounded-lg transition-all duration-500"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                     />
                   </div>
                 </div>
@@ -257,7 +257,7 @@ const ClinicRegistration = () => {
                   onClick={handleGetLocation}
                   disabled={gettingLocation}
                   variant="outline"
-                  className="w-full h-12 rounded-lg transition-all duration-500"
+                  className="w-full h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                 >
                   {gettingLocation ? (
                     <>
@@ -272,54 +272,54 @@ const ClinicRegistration = () => {
                   )}
                 </Button>
                 {formData.location.lat && formData.location.lon && (
-                  <div className="text-sm text-slate-600 dark:text-slate-400 text-center">
+                  <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 text-center">
                     ✓ Location: {parseFloat(formData.location.lat).toFixed(4)}, {parseFloat(formData.location.lon).toFixed(4)}
                   </div>
                 )}
               </div>
 
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Doctor Information</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="font-semibold text-base sm:text-lg">Doctor Information</h3>
                 <Input
                   data-testid="doctor-name-input"
                   placeholder="Doctor Name *"
                   value={formData.doctor.name}
                   onChange={(e) => setFormData({...formData, doctor: {...formData.doctor, name: e.target.value}})}
                   required
-                  className="h-12 rounded-lg transition-all duration-500"
+                  className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                 />
                 <Input
                   data-testid="doctor-specialization-input"
-                  placeholder="Specialization (e.g., Cardiology, General Medicine) *"
+                  placeholder="Specialization *"
                   value={formData.doctor.specialization}
                   onChange={(e) => setFormData({...formData, doctor: {...formData.doctor, specialization: e.target.value}})}
                   required
-                  className="h-12 rounded-lg transition-all duration-500"
+                  className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-4">
                   <Input
                     data-testid="doctor-experience-input"
                     type="number"
-                    placeholder="Experience (years) *"
+                    placeholder="Experience (yrs) *"
                     value={formData.doctor.experience}
                     onChange={(e) => setFormData({...formData, doctor: {...formData.doctor, experience: e.target.value}})}
                     required
                     min="0"
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                   <Input
                     data-testid="doctor-availability-input"
-                    placeholder="Availability (e.g., 9 AM - 6 PM) *"
+                    placeholder="Hours (9AM-6PM) *"
                     value={formData.doctor.availability_hours}
                     onChange={(e) => setFormData({...formData, doctor: {...formData.doctor, availability_hours: e.target.value}})}
                     required
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Facilities & Services</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="font-semibold text-base sm:text-lg">Facilities & Services</h3>
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     data-testid="has-nurses-checkbox"
@@ -327,7 +327,7 @@ const ClinicRegistration = () => {
                     checked={formData.has_nurses}
                     onCheckedChange={(checked) => setFormData({...formData, has_nurses: checked})}
                   />
-                  <Label htmlFor="has_nurses" className="cursor-pointer">Has Nurses</Label>
+                  <Label htmlFor="has_nurses" className="cursor-pointer text-sm">Has Nurses</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -336,7 +336,7 @@ const ClinicRegistration = () => {
                     checked={formData.has_medicine_shop}
                     onCheckedChange={(checked) => setFormData({...formData, has_medicine_shop: checked})}
                   />
-                  <Label htmlFor="has_medicine_shop" className="cursor-pointer">Has Medicine Shop</Label>
+                  <Label htmlFor="has_medicine_shop" className="cursor-pointer text-sm">Has Medicine Shop</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -345,13 +345,13 @@ const ClinicRegistration = () => {
                     checked={formData.accepts_emergencies}
                     onCheckedChange={(checked) => setFormData({...formData, accepts_emergencies: checked})}
                   />
-                  <Label htmlFor="accepts_emergencies" className="cursor-pointer">Accepts Emergencies</Label>
+                  <Label htmlFor="accepts_emergencies" className="cursor-pointer text-sm">Accepts Emergencies</Label>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
                 <div>
-                  <Label htmlFor="fees">Consultation Fees (Optional)</Label>
+                  <Label htmlFor="fees" className="text-sm">Consultation Fees</Label>
                   <Input
                     data-testid="fees-input"
                     id="fees"
@@ -360,11 +360,11 @@ const ClinicRegistration = () => {
                     placeholder="500"
                     value={formData.fees}
                     onChange={(e) => setFormData({...formData, fees: e.target.value})}
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="contact_phone">Contact Phone *</Label>
+                  <Label htmlFor="contact_phone" className="text-sm">Contact Phone *</Label>
                   <Input
                     data-testid="contact-phone-input"
                     id="contact_phone"
@@ -372,7 +372,7 @@ const ClinicRegistration = () => {
                     value={formData.contact_phone}
                     onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
                     required
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
               </div>
@@ -381,7 +381,7 @@ const ClinicRegistration = () => {
                 data-testid="submit-clinic-button"
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full py-6 text-lg font-semibold"
+                className="w-full rounded-full py-5 sm:py-6 text-base sm:text-lg font-semibold"
               >
                 {loading ? 'Registering...' : 'Register Clinic'}
               </Button>

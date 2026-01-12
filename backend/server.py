@@ -189,12 +189,26 @@ async def get_request_status(request_id: str, current_user: dict = Depends(get_c
             {"_id": 0}
         )
         if doctor:
+            # Get facility location
+            facility_location = None
+            facility_id = doctor.get("facility_id")
+            if facility_id:
+                clinic = await db.clinics.find_one({"clinic_id": facility_id}, {"_id": 0, "location": 1})
+                if clinic:
+                    facility_location = clinic.get("location")
+                else:
+                    hospital = await db.hospitals.find_one({"hospital_id": facility_id}, {"_id": 0, "location": 1})
+                    if hospital:
+                        facility_location = hospital.get("location")
+            
             assigned_doctor = {
                 "doctor_id": doctor["doctor_id"],
                 "name": doctor["full_name"],
                 "specialization": doctor["specialization"],
                 "phone": doctor.get("phone"),
-                "facility_name": doctor.get("facility_name")
+                "facility_name": doctor.get("facility_name"),
+                "facility_type": doctor.get("facility_type"),
+                "location": facility_location
             }
     
     return {
@@ -204,8 +218,45 @@ async def get_request_status(request_id: str, current_user: dict = Depends(get_c
         "symptoms": request_doc.get("symptoms"),
         "assigned_doctor": assigned_doctor,
         "matching_doctors_count": len(request_doc.get("matched_doctors", [])),
-        "requested_at": request_doc.get("requested_at")
+        "requested_at": request_doc.get("requested_at"),
+        "bill_breakdown": request_doc.get("bill_breakdown")
     }
+
+@api_router.get("/patient/history")
+async def get_patient_history(current_user: dict = Depends(get_current_user)):
+    """Get patient's consultation history"""
+    # Get patient requests
+    requests = await db.patient_requests.find(
+        {"patient_id": current_user["sub"]},
+        {"_id": 0}
+    ).sort("requested_at", -1).limit(50).to_list(50)
+    
+    # Enrich with doctor info
+    history = []
+    for req in requests:
+        item = {
+            "request_id": req.get("request_id"),
+            "symptoms": req.get("symptoms"),
+            "status": req.get("status"),
+            "urgency_level": req.get("urgency_level"),
+            "requested_at": req.get("requested_at"),
+            "bill_breakdown": req.get("bill_breakdown"),
+            "total_paid": req.get("bill_breakdown", {}).get("total") if req.get("bill_breakdown") else None
+        }
+        
+        # Get doctor info if assigned
+        if req.get("assigned_doctor_id"):
+            doctor = await db.doctors.find_one(
+                {"doctor_id": req["assigned_doctor_id"]},
+                {"_id": 0, "full_name": 1, "specialization": 1}
+            )
+            if doctor:
+                item["doctor_name"] = doctor.get("full_name")
+                item["specialty"] = doctor.get("specialization")
+        
+        history.append(item)
+    
+    return history
 
 @api_router.post("/analyze-symptoms", response_model=SymptomAnalysisResponse)
 async def analyze_symptoms(request: SymptomAnalysisRequest, current_user: dict = Depends(get_current_user)):
@@ -277,57 +328,66 @@ async def find_matching_doctors(specialty: str, urgency: str) -> list:
     """Find online doctors matching the specialty"""
     doctors = []
     
-    # Map common symptoms to medical specialties
+    # Map specialties to keywords for flexible matching
     specialty_keywords = {
-        "neurosurgery": ["brain", "head", "neurological", "seizure", "stroke", "concussion", "headache", "migraine", "dizziness", "vertigo", "memory", "cognitive", "neurosurgery", "neurosurgeon", "neural", "neuro", "skull", "spinal cord", "tumor", "aneurysm"],
-        "neurology": ["brain", "head", "neurological", "seizure", "stroke", "concussion", "headache", "migraine", "dizziness", "vertigo", "memory", "cognitive", "neurology", "neurologist", "neural", "neuro", "nerve", "paralysis"],
-        "cardiology": ["heart", "chest", "cardiac", "arrhythmia", "blood pressure", "hypertension", "palpitation", "angina", "cardiology", "cardiologist"],
-        "orthopedics": ["bone", "fracture", "joint", "spine", "back", "knee", "shoulder", "arthritis", "ligament", "orthopedic", "orthopedics"],
-        "gastroenterology": ["stomach", "digestive", "liver", "intestine", "ulcer", "acid reflux", "diarrhea", "constipation", "nausea", "gastro", "gastrointestinal"],
-        "pulmonology": ["lung", "respiratory", "asthma", "cough", "breathing", "pneumonia", "bronchitis", "shortness of breath", "pulmonary"],
-        "dermatology": ["skin", "rash", "acne", "eczema", "psoriasis", "allergy", "itching", "dermatology", "dermatologist"],
-        "ophthalmology": ["eye", "vision", "sight", "blindness", "cataract", "glaucoma", "myopia", "ophthalmology", "ophthalmologist"],
-        "general medicine": ["fever", "cold", "flu", "infection", "general", "checkup", "consultation", "wellness"]
+        "neurosurgery": ["neurosurgery", "neurosurgeon", "brain surgery", "neuro"],
+        "neurology": ["neurology", "neurologist", "neuro"],
+        "cardiology": ["cardiology", "cardiologist", "heart", "cardiac"],
+        "orthopedics": ["orthopedics", "orthopaedics", "orthopedic", "orthopaedic", "bone", "joint", "fracture", "surgeon"],
+        "gastroenterology": ["gastroenterology", "gastroenterologist", "gastro", "digestive"],
+        "pulmonology": ["pulmonology", "pulmonologist", "lung", "respiratory"],
+        "dermatology": ["dermatology", "dermatologist", "skin"],
+        "ophthalmology": ["ophthalmology", "ophthalmologist", "eye"],
+        "general medicine": ["general", "medicine", "physician", "gp", "family"],
+        "emergency medicine": ["emergency", "trauma", "critical"]
     }
     
-    # Find matching specialties based on keywords
-    matched_specialties = set()
-    specialty_lower = specialty.lower()
+    # Normalize the AI-returned specialty
+    specialty_lower = specialty.lower().strip()
     
-    # First try exact keyword matching
-    for spec, keywords in specialty_keywords.items():
-        for keyword in keywords:
-            if keyword in specialty_lower:
-                matched_specialties.add(spec)
+    # Find all keywords that match this specialty
+    search_keywords = set()
+    for spec_name, keywords in specialty_keywords.items():
+        if spec_name in specialty_lower or specialty_lower in spec_name:
+            search_keywords.update(keywords)
+        for kw in keywords:
+            if kw in specialty_lower:
+                search_keywords.update(keywords)
                 break
     
-    # If no match found, add the specialty as-is for flexible matching
-    if not matched_specialties:
-        matched_specialties.add(specialty.lower())
+    # If no keywords found, use the specialty itself
+    if not search_keywords:
+        search_keywords.add(specialty_lower)
     
-    # Find online doctors with matching specialization
+    print(f"[DEBUG] AI specialty: '{specialty}' → Search keywords: {search_keywords}")
+    
+    # Find online doctors
     all_doctors = await db.doctors.find({}, {"_id": 0}).to_list(100)
+    online_doctors = []
     
     for doctor in all_doctors:
-        # Check if doctor is online
-        if not doctor.get("availability", {}).get("is_online", False):
+        is_online = doctor.get("availability", {}).get("is_online", False)
+        if not is_online:
             continue
         
+        online_doctors.append(doctor)
         doctor_spec = doctor.get("specialization", "").lower()
         
-        # Check if any matched specialty is in the doctor's specialization
-        for matched_spec in matched_specialties:
-            # Flexible matching: check if specialty keywords match
-            if matched_spec in doctor_spec or doctor_spec in matched_spec:
+        # Check if any keyword matches the doctor's specialization
+        for keyword in search_keywords:
+            if keyword in doctor_spec or doctor_spec in keyword:
                 doctors.append(doctor)
-                break
-            
-            # Also check for partial matches (e.g., "neurosurgery" matches "neurosurgeon")
-            if matched_spec.replace("y", "") in doctor_spec or doctor_spec.replace("y", "") in matched_spec:
-                doctors.append(doctor)
+                print(f"[DEBUG] Matched doctor: {doctor.get('full_name')} ({doctor_spec})")
                 break
     
-    return doctors[:10]  # Return top 10 matching doctors
+    print(f"[DEBUG] Total doctors: {len(all_doctors)}, Online: {len(online_doctors)}, Matched: {len(doctors)}")
+    
+    # If no specialty match but there are online doctors, return all online doctors
+    if not doctors and online_doctors:
+        print(f"[DEBUG] No specialty match, returning all {len(online_doctors)} online doctors")
+        return online_doctors[:10]
+    
+    return doctors[:10]
 
 async def find_matching_facilities(specialty: str, urgency: str, location: dict = None) -> List[FacilityMatch]:
     facilities = []
@@ -499,6 +559,115 @@ async def get_user_history(current_user: dict = Depends(get_current_user)):
     ).sort("analysis_timestamp", -1).limit(20).to_list(20)
     return history
 
+@api_router.post("/auth/register-clinic", status_code=status.HTTP_201_CREATED)
+async def register_clinic_admin(data: dict):
+    """Register a new clinic administrator and create their clinic"""
+    existing_user = await db.users.find_one({"email": data.get("email")})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    admin_id = str(uuid.uuid4())
+    facility_id = str(uuid.uuid4())
+    
+    # Create admin user
+    user_doc = {
+        "user_id": admin_id,
+        "email": data.get("email"),
+        "password": hash_password(data.get("password")),
+        "full_name": data.get("full_name"),
+        "role": "clinic_admin",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Create clinic
+    clinic_doc = {
+        "clinic_id": facility_id,
+        "clinic_name": data.get("clinic_name"),
+        "location": data.get("location", {"address": data.get("clinic_address", "")}),
+        "doctor": data.get("doctor", {}),
+        "has_nurses": data.get("has_nurses", False),
+        "has_medicine_shop": data.get("has_medicine_shop", False),
+        "accepts_emergencies": data.get("accepts_emergencies", False),
+        "fees": data.get("fees"),
+        "contact_phone": data.get("phone"),
+        "license_number": data.get("license_number"),
+        "owner_id": admin_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(user_doc)
+    await db.clinics.insert_one(clinic_doc)
+    
+    token = create_access_token({"sub": admin_id, "email": data.get("email"), "role": "clinic_admin"})
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "facility_id": facility_id,
+        "user": {
+            "email": data.get("email"),
+            "full_name": data.get("full_name"),
+            "role": "clinic_admin",
+            "created_at": user_doc["created_at"]
+        }
+    }
+
+@api_router.post("/auth/register-hospital", status_code=status.HTTP_201_CREATED)
+async def register_hospital_admin(data: dict):
+    """Register a new hospital administrator and create their hospital"""
+    existing_user = await db.users.find_one({"email": data.get("email")})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    admin_id = str(uuid.uuid4())
+    facility_id = str(uuid.uuid4())
+    
+    # Create admin user
+    user_doc = {
+        "user_id": admin_id,
+        "email": data.get("email"),
+        "password": hash_password(data.get("password")),
+        "full_name": data.get("full_name"),
+        "role": "hospital_admin",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Create hospital
+    hospital_doc = {
+        "hospital_id": facility_id,
+        "hospital_name": data.get("hospital_name"),
+        "hospital_type": data.get("hospital_type", "private"),
+        "location": {"address": data.get("hospital_address", "")},
+        "doctors": [],
+        "total_rooms": data.get("bed_count", 0),
+        "icu_beds": 0,
+        "has_emergency_dept": False,
+        "operation_theatres": 0,
+        "nurses_count": 0,
+        "services": [],
+        "contact_phone": data.get("phone"),
+        "license_number": data.get("license_number"),
+        "owner_id": admin_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(user_doc)
+    await db.hospitals.insert_one(hospital_doc)
+    
+    token = create_access_token({"sub": admin_id, "email": data.get("email"), "role": "hospital_admin"})
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "facility_id": facility_id,
+        "user": {
+            "email": data.get("email"),
+            "full_name": data.get("full_name"),
+            "role": "hospital_admin",
+            "created_at": user_doc["created_at"]
+        }
+    }
+
 @api_router.post("/auth/register-doctor", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register_doctor(doctor: DoctorRegistration):
     existing_user = await db.users.find_one({"email": doctor.email})
@@ -655,7 +824,7 @@ async def accept_patient_request(request_id: str, current_user: dict = Depends(g
     }
 
 @api_router.post("/doctor/request/{request_id}/complete")
-async def complete_patient_request(request_id: str, current_user: dict = Depends(get_current_user)):
+async def complete_patient_request(request_id: str, body: dict = None, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can complete requests")
     
@@ -664,9 +833,16 @@ async def complete_patient_request(request_id: str, current_user: dict = Depends
     if not request_doc or request_doc.get("assigned_doctor_id") != current_user["sub"]:
         raise HTTPException(status_code=404, detail="Request not found or not assigned to you")
     
+    # Get bill breakdown from request body
+    bill_breakdown = body.get("bill_breakdown") if body else None
+    
+    update_data = {"status": "completed"}
+    if bill_breakdown:
+        update_data["bill_breakdown"] = bill_breakdown
+    
     result = await db.patient_requests.update_one(
         {"request_id": request_id},
-        {"$set": {"status": "completed"}}
+        {"$set": update_data}
     )
     
     if result.modified_count == 0:
@@ -677,7 +853,7 @@ async def complete_patient_request(request_id: str, current_user: dict = Depends
         {"$inc": {"patients_treated": 1}}
     )
     
-    return {"message": "Request completed"}
+    return {"message": "Request completed", "bill_breakdown": bill_breakdown}
 
 @api_router.get("/facilities/search")
 async def search_facilities(query: str = ""):
@@ -715,6 +891,25 @@ async def health_check():
         "status": "healthy",
         "service": "AyuMitraAI",
         "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@api_router.get("/debug/doctors")
+async def debug_doctors():
+    """Debug endpoint to check all doctors and their online status"""
+    all_doctors = await db.doctors.find({}, {"_id": 0}).to_list(100)
+    online_count = sum(1 for d in all_doctors if d.get("availability", {}).get("is_online", False))
+    return {
+        "total_doctors": len(all_doctors),
+        "online_doctors": online_count,
+        "doctors": [
+            {
+                "doctor_id": d.get("doctor_id"),
+                "name": d.get("full_name"),
+                "specialization": d.get("specialization"),
+                "is_online": d.get("availability", {}).get("is_online", False)
+            }
+            for d in all_doctors
+        ]
     }
 
 app.include_router(api_router)

@@ -96,28 +96,28 @@ const Signup = () => {
         navigate('/dashboard');
       }
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Registration failed');
+      toast.error(error.response?.data?.detail || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div data-testid="signup-page" className="min-h-screen flex items-center justify-center px-6 py-12 transition-colors duration-500">
-      <Card className="w-full max-w-md transition-colors duration-500">
-        <CardHeader>
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center">
-              <UserPlus className="w-8 h-8 text-white" />
+    <div data-testid="signup-page" className="min-h-screen flex items-center justify-center px-4 sm:px-6 py-6 sm:py-12 transition-colors duration-500">
+      <Card className="w-full max-w-md transition-colors duration-500 max-h-[90vh] overflow-y-auto">
+        <CardHeader className="px-4 sm:px-6 pt-6 sm:pt-8 sticky top-0 bg-white dark:bg-slate-950 z-10">
+          <div className="flex items-center justify-center mb-3 sm:mb-4">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center">
+              <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-3xl text-center" style={{ fontFamily: 'Manrope, sans-serif' }}>Create Account</CardTitle>
-          <CardDescription className="text-center">Join AyuMitraAI for intelligent health routing</CardDescription>
+          <CardTitle className="text-2xl sm:text-3xl text-center" style={{ fontFamily: 'Manrope, sans-serif' }}>Create Account</CardTitle>
+          <CardDescription className="text-center text-sm sm:text-base">Join AyuMitraAI for intelligent health routing</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form data-testid="signup-form" onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="px-4 sm:px-6 pb-6 sm:pb-8">
+          <form data-testid="signup-form" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             <div>
-              <Label htmlFor="full_name">Full Name</Label>
+              <Label htmlFor="full_name" className="text-sm">Full Name</Label>
               <Input
                 data-testid="signup-name-input"
                 id="full_name"
@@ -125,11 +125,11 @@ const Signup = () => {
                 onChange={(e) => setFormData({...formData, full_name: e.target.value})}
                 placeholder="John Doe"
                 required
-                className="h-12 rounded-lg transition-all duration-500"
+                className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
               />
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm">Email</Label>
               <Input
                 data-testid="signup-email-input"
                 id="email"
@@ -138,11 +138,11 @@ const Signup = () => {
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
                 placeholder="you@example.com"
                 required
-                className="h-12 rounded-lg transition-all duration-500"
+                className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
               />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm">Password</Label>
               <Input
                 data-testid="signup-password-input"
                 id="password"
@@ -152,13 +152,13 @@ const Signup = () => {
                 placeholder="Minimum 6 characters"
                 required
                 minLength={6}
-                className="h-12 rounded-lg transition-all duration-500"
+                className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
               />
             </div>
             <div>
-              <Label htmlFor="role">Account Type</Label>
+              <Label htmlFor="role" className="text-sm">Account Type</Label>
               <Select value={formData.role} onValueChange={(value) => setFormData({...formData, role: value})}>
-                <SelectTrigger data-testid="signup-role-select" className="h-12 rounded-lg transition-all duration-500">
+                <SelectTrigger data-testid="signup-role-select" className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -173,31 +173,31 @@ const Signup = () => {
             {formData.role === 'doctor' && (
               <>
                 <div>
-                  <Label htmlFor="facility_id">Clinic/Hospital ID</Label>
+                  <Label htmlFor="facility_id" className="text-sm">Clinic/Hospital ID</Label>
                   <Input
                     id="facility_id"
                     value={formData.facility_id}
                     onChange={(e) => setFormData({...formData, facility_id: e.target.value})}
-                    placeholder="Enter unique facility ID from your clinic/hospital"
+                    placeholder="Enter unique facility ID"
                     required
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                   <p className="text-xs text-slate-500 mt-1">Contact your clinic/hospital administrator for this ID</p>
                 </div>
                 <div>
-                  <Label htmlFor="specialization">Specialization</Label>
+                  <Label htmlFor="specialization" className="text-sm">Specialization</Label>
                   <Input
                     id="specialization"
                     value={formData.specialization}
                     onChange={(e) => setFormData({...formData, specialization: e.target.value})}
-                    placeholder="e.g., Cardiology, General Medicine"
+                    placeholder="e.g., Cardiology"
                     required
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-4">
                   <div>
-                    <Label htmlFor="experience_years">Experience (Years)</Label>
+                    <Label htmlFor="experience_years" className="text-sm">Experience (Yrs)</Label>
                     <Input
                       id="experience_years"
                       type="number"
@@ -206,23 +206,23 @@ const Signup = () => {
                       placeholder="5"
                       required
                       min="0"
-                      className="h-12 rounded-lg transition-all duration-500"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="license_number">License Number</Label>
+                    <Label htmlFor="license_number" className="text-sm">License No.</Label>
                     <Input
                       id="license_number"
                       value={formData.license_number}
                       onChange={(e) => setFormData({...formData, license_number: e.target.value})}
                       placeholder="MED12345"
                       required
-                      className="h-12 rounded-lg transition-all duration-500"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                     />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone" className="text-sm">Phone Number</Label>
                   <Input
                     id="phone"
                     type="tel"
@@ -230,7 +230,7 @@ const Signup = () => {
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     placeholder="+1234567890"
                     required
-                    className="h-12 rounded-lg transition-all duration-500"
+                    className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   />
                 </div>
               </>
@@ -466,11 +466,11 @@ const Signup = () => {
               </>
             )}
 
-            <Button data-testid="signup-submit-button" type="submit" disabled={loading} className="w-full rounded-full py-6">
+            <Button data-testid="signup-submit-button" type="submit" disabled={loading} className="w-full rounded-full py-5 sm:py-6 text-sm sm:text-base">
               {loading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
-          <p className="text-center mt-6 text-sm text-slate-600 dark:text-slate-400">
+          <p className="text-center mt-4 sm:mt-6 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
             Already have an account?{' '}
             <Link to="/login" className="text-teal-600 dark:text-teal-400 font-medium hover:underline">
               Sign in

@@ -1,106 +1,128 @@
 # AyuMitraAI
 
-A Motia project created with the **multi-language** starter template (TypeScript + Python).
+AI-powered medical symptom analysis and intelligent doctor routing system.
 
-## What is Motia?
+## Overview
 
-Motia is an open-source, unified backend framework that eliminates runtime fragmentation by bringing **APIs, background jobs, queueing, streaming, state, workflows, AI agents, observability, scaling, and deployment** into one unified system using a single core primitive, the **Step**.
+AyuMitraAI connects patients with the right healthcare providers using AI-driven symptom analysis. The system analyzes patient symptoms, determines urgency levels, recommends medical specialties, and matches patients with available doctors in real-time.
 
-## Polyglot Architecture
+## Tech Stack
 
-This template demonstrates Motia's polyglot capabilities by combining:
-
-- **TypeScript**: API endpoint (`hello-api.step.ts`) - handles HTTP requests
-- **Python**: Event processor (`process_greeting_step.py`) - handles background processing
-- **JavaScript**: Logger (`log-greeting.step.js`) - handles workflow completion
-
-This shows how you can use the best language for each task while keeping everything in a single unified system.
+- **Backend**: FastAPI (Python) with MongoDB
+- **Frontend**: React with Tailwind CSS
+- **AI**: Cerebras LLM for symptom analysis
+- **Database**: MongoDB Atlas
 
 ## Quick Start
 
-```bash
-# Start the development server
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
+### Prerequisites
 
-This starts the Motia runtime and the **Workbench** - a powerful UI for developing and debugging your workflows. By default, it's available at [`http://localhost:3000`](http://localhost:3000).
+- Python 3.9+
+- Node.js 18+
+- MongoDB Atlas account (or local MongoDB)
+
+### Backend Setup
 
 ```bash
-# Test your first endpoint
-curl http://localhost:3000/hello
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate (Windows)
+venv\Scripts\activate
+
+# Activate (Mac/Linux)
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+pip install dnspython  # For MongoDB Atlas SRV connections
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your MongoDB URI and API keys
+
+# Run server
+python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## How It Works
-
-1. **TypeScript API Step** receives the HTTP request at `/hello`
-2. It emits a `process-greeting` event with the request data
-3. **Python Event Step** picks up the event, processes it, and stores the result in state
-4. Python emits a `greeting-processed` event
-5. **JavaScript Event Step** logs the completed workflow
-
-## Step Types
-
-Every Step has a `type` that defines how it triggers:
-
-| Type | When it runs | Use case |
-|------|--------------|----------|
-| **`api`** | HTTP request | REST APIs, webhooks |
-| **`event`** | Event emitted | Background jobs, workflows |
-| **`cron`** | Schedule | Cleanup, reports, reminders |
-
-## Development Commands
+### Frontend Setup
 
 ```bash
-# Start Workbench and development server
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+cd frontend
 
-# Start production server (without hot reload)
-npm run start
-# or
-yarn start
-# or
-pnpm start
+# Install dependencies
+npm install
 
-# Generate TypeScript types from Step configs
-npm run generate-types
-# or
-yarn generate-types
-# or
-pnpm generate-types
+# Configure environment
+# Edit .env with backend URL (default: http://127.0.0.1:8000)
 
-# Build project for deployment
-npm run build
-# or
-yarn build
-# or
-pnpm build
+# Run development server
+npm start
 ```
+
+## Environment Variables
+
+### Backend (.env)
+
+```env
+MONGO_URL=mongodb+srv://user:pass@cluster.mongodb.net/?appName=YourApp
+DB_NAME=ayumitraai
+JWT_SECRET=your-secret-key
+CEREBRAS_API_KEY=your-cerebras-key
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```
+
+### Frontend (.env)
+
+```env
+REACT_APP_BACKEND_URL=http://127.0.0.1:8000
+```
+
+## Features
+
+- **Patient Registration & Login**: Secure authentication with JWT
+- **Doctor Registration**: Doctors register with clinic/hospital facility IDs
+- **Clinic/Hospital Admin Registration**: Admins get unique facility IDs for doctor onboarding
+- **AI Symptom Analysis**: Cerebras-powered analysis with urgency scoring
+- **Doctor Matching**: Real-time matching based on specialty and availability
+- **Doctor Dashboard**: Manage availability, view patient requests, accept/complete consultations
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Register patient |
+| `/api/auth/login` | POST | Login |
+| `/api/auth/register-doctor` | POST | Register doctor |
+| `/api/auth/register-clinic` | POST | Register clinic admin |
+| `/api/auth/register-hospital` | POST | Register hospital admin |
+| `/api/analyze-symptoms` | POST | AI symptom analysis |
+| `/api/connect-with-doctor` | POST | Connect patient with doctors |
+| `/api/doctor/availability` | PUT | Update doctor availability |
+| `/api/doctor/requests` | GET | Get patient requests |
 
 ## Project Structure
 
 ```
-steps/                           # Your Step definitions
-├── hello/
-│   ├── hello-api.step.ts       # TypeScript API endpoint
-│   ├── process_greeting_step.py # Python event processor
-│   └── log-greeting.step.js    # JavaScript logger
-motia.config.ts                  # Motia configuration
-requirements.txt                 # Python dependencies
+AyuMitraAI/
+├── backend/
+│   ├── server.py          # FastAPI application
+│   ├── models.py          # Pydantic models
+│   ├── auth.py            # JWT authentication
+│   ├── config.py          # Configuration
+│   ├── cerebras_service.py # AI symptom analysis
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── pages/         # React pages
+│   │   ├── components/    # UI components
+│   │   └── utils/         # API client, auth helpers
+│   └── package.json
+└── README.md
 ```
 
-Steps are auto-discovered from your `steps/` or `src/` directories - no manual registration required.
+## License
 
-## Learn More
-
-- [Documentation](https://motia.dev/docs) - Complete guides and API reference
-- [Quick Start Guide](https://motia.dev/docs/getting-started/quick-start) - Detailed getting started tutorial
-- [Core Concepts](https://motia.dev/docs/concepts/overview) - Learn about Steps and Motia architecture
-- [Discord Community](https://discord.gg/motia) - Get help and connect with other developers
+MIT

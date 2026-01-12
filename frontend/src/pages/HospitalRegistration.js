@@ -134,25 +134,25 @@ const HospitalRegistration = () => {
   };
 
   return (
-    <div data-testid="hospital-registration-page" className="min-h-screen py-12 px-6 transition-colors duration-500">
+    <div data-testid="hospital-registration-page" className="min-h-screen py-6 sm:py-12 px-4 sm:px-6 transition-colors duration-500">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-teal-500 to-sky-500 mb-4">
-            <Building className="w-8 h-8 text-white" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-teal-500 to-sky-500 mb-3 sm:mb-4">
+            <Building className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold mb-2 text-slate-900 dark:text-slate-100 transition-colors duration-500" style={{ fontFamily: 'Manrope, sans-serif' }}>Register Your Hospital</h1>
-          <p className="text-slate-600 dark:text-slate-400 transition-colors duration-500">Multi-step registration for comprehensive hospital information</p>
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2 text-slate-900 dark:text-slate-100 transition-colors duration-500" style={{ fontFamily: 'Manrope, sans-serif' }}>Register Your Hospital</h1>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 transition-colors duration-500">Multi-step registration for comprehensive hospital information</p>
         </div>
 
-        <div data-testid="stepper" className="flex justify-center mb-8">
+        <div data-testid="stepper" className="flex justify-center mb-6 sm:mb-8">
           {[1, 2, 3].map(s => (
             <div key={s} className="flex items-center">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-500 ${
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base transition-all duration-500 ${
                 step >= s ? 'bg-teal-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
               }`}>
                 {s}
               </div>
-              {s < 3 && <div className={`w-20 h-1 transition-all duration-500 ${
+              {s < 3 && <div className={`w-12 sm:w-20 h-1 transition-all duration-500 ${
                 step > s ? 'bg-teal-500' : 'bg-slate-200 dark:bg-slate-700'
               }`} />}
             </div>
@@ -161,57 +161,57 @@ const HospitalRegistration = () => {
 
         {registeredHospital ? (
           <Card className="transition-colors duration-500">
-            <CardHeader>
-              <CardTitle className="text-green-600 dark:text-green-400">✓ Hospital Registered Successfully!</CardTitle>
-              <CardDescription>Share this unique ID with doctors for registration</CardDescription>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-green-600 dark:text-green-400 text-lg sm:text-xl">✓ Hospital Registered Successfully!</CardTitle>
+              <CardDescription className="text-sm">Share this unique ID with doctors for registration</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-teal-50 dark:bg-teal-950/30 border-2 border-teal-500 rounded-xl p-6 text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Unique Hospital ID</p>
-                <p className="text-3xl font-bold text-teal-600 dark:text-teal-400 font-mono tracking-wider">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
+              <div className="bg-teal-50 dark:bg-teal-950/30 border-2 border-teal-500 rounded-xl p-4 sm:p-6 text-center">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2">Unique Hospital ID</p>
+                <p className="text-xl sm:text-3xl font-bold text-teal-600 dark:text-teal-400 font-mono tracking-wider break-all">
                   {registeredHospital.hospital_id}
                 </p>
-                <p className="text-xs text-slate-500 mt-3">Doctors need this ID to register with your hospital</p>
+                <p className="text-xs text-slate-500 mt-2 sm:mt-3">Doctors need this ID to register with your hospital</p>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 text-sm">
                 <p><strong>Hospital Name:</strong> {registeredHospital.hospital_name}</p>
                 <p><strong>Type:</strong> {registeredHospital.hospital_type}</p>
                 <p><strong>Location:</strong> {registeredHospital.location.address}</p>
                 <p><strong>Doctors:</strong> {registeredHospital.doctors_count}</p>
                 <p><strong>Emergency Dept:</strong> {registeredHospital.has_emergency_dept ? 'Yes' : 'No'}</p>
               </div>
-              <Button onClick={() => navigate('/dashboard')} className="w-full">
+              <Button onClick={() => navigate('/dashboard')} className="w-full py-5 sm:py-6">
                 Go to Dashboard
               </Button>
             </CardContent>
           </Card>
         ) : (
           <Card className="transition-colors duration-500">
-            <CardHeader>
-              <CardTitle>
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-lg sm:text-xl">
                 {step === 1 && 'Basic Information'}
                 {step === 2 && 'Doctors & Staff'}
                 {step === 3 && 'Facilities & Services'}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 sm:px-6">
             <form data-testid="hospital-registration-form" onSubmit={handleSubmit}>
               {step === 1 && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div>
-                    <Label>Hospital Name *</Label>
+                    <Label className="text-sm">Hospital Name *</Label>
                     <Input
                       data-testid="hospital-name-input"
                       value={formData.hospital_name}
                       onChange={(e) => setFormData({...formData, hospital_name: e.target.value})}
                       required
-                      className="h-12 rounded-lg transition-all duration-500"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                     />
                   </div>
                   <div>
-                    <Label>Hospital Type *</Label>
+                    <Label className="text-sm">Hospital Type *</Label>
                     <Select value={formData.hospital_type} onValueChange={(value) => setFormData({...formData, hospital_type: value})}>
-                      <SelectTrigger data-testid="hospital-type-select" className="h-12 rounded-lg transition-all duration-500">
+                      <SelectTrigger data-testid="hospital-type-select" className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -221,36 +221,36 @@ const HospitalRegistration = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label>Address *</Label>
+                    <Label className="text-sm">Address *</Label>
                     <Input
                       data-testid="hospital-address-input"
                       value={formData.location.address}
                       onChange={(e) => setFormData({...formData, location: {...formData.location, address: e.target.value}})}
                       required
-                      className="h-12 rounded-lg transition-all duration-500"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4">
                     <div>
-                      <Label>Latitude</Label>
+                      <Label className="text-sm">Latitude</Label>
                       <Input
                         data-testid="hospital-lat-input"
                         type="number"
                         step="any"
                         value={formData.location.lat}
                         onChange={(e) => setFormData({...formData, location: {...formData.location, lat: e.target.value}})}
-                        className="h-12 rounded-lg transition-all duration-500"
+                        className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                       />
                     </div>
                     <div>
-                      <Label>Longitude</Label>
+                      <Label className="text-sm">Longitude</Label>
                       <Input
                         data-testid="hospital-lon-input"
                         type="number"
                         step="any"
                         value={formData.location.lon}
                         onChange={(e) => setFormData({...formData, location: {...formData.location, lon: e.target.value}})}
-                        className="h-12 rounded-lg transition-all duration-500"
+                        className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                       />
                     </div>
                   </div>
@@ -259,7 +259,7 @@ const HospitalRegistration = () => {
                     onClick={handleGetLocation}
                     disabled={gettingLocation}
                     variant="outline"
-                    className="w-full h-12 rounded-lg transition-all duration-500"
+                    className="w-full h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                   >
                     {gettingLocation ? (
                       <>
@@ -274,35 +274,35 @@ const HospitalRegistration = () => {
                     )}
                   </Button>
                   {formData.location.lat && formData.location.lon && (
-                    <div className="text-sm text-slate-600 dark:text-slate-400 text-center">
+                    <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 text-center">
                       ✓ Location: {parseFloat(formData.location.lat).toFixed(4)}, {parseFloat(formData.location.lon).toFixed(4)}
                     </div>
                   )}
                   <div>
-                    <Label>Contact Phone *</Label>
+                    <Label className="text-sm">Contact Phone *</Label>
                     <Input
                       data-testid="hospital-phone-input"
                       value={formData.contact_phone}
                       onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
                       required
-                      className="h-12 rounded-lg transition-all duration-500"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                     />
                   </div>
                 </div>
               )}
 
               {step === 2 && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-semibold">Doctors ({formData.doctors.length})</h3>
-                    <Button data-testid="add-doctor-button" type="button" onClick={addDoctor} size="sm">
-                      <Plus className="w-4 h-4 mr-1" /> Add Doctor
+                    <h3 className="font-semibold text-sm sm:text-base">Doctors ({formData.doctors.length})</h3>
+                    <Button data-testid="add-doctor-button" type="button" onClick={addDoctor} size="sm" className="text-xs sm:text-sm">
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" /> Add
                     </Button>
                   </div>
                   {formData.doctors.map((doctor, idx) => (
-                    <div key={idx} data-testid={`doctor-${idx}`} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg space-y-3 transition-colors duration-500">
+                    <div key={idx} data-testid={`doctor-${idx}`} className="p-3 sm:p-4 border border-slate-200 dark:border-slate-700 rounded-lg space-y-2 sm:space-y-3 transition-colors duration-500">
                       <div className="flex justify-between">
-                        <h4 className="font-medium">Doctor {idx + 1}</h4>
+                        <h4 className="font-medium text-sm">Doctor {idx + 1}</h4>
                         {formData.doctors.length > 1 && (
                           <Button data-testid={`remove-doctor-${idx}`} type="button" onClick={() => removeDoctor(idx)} variant="ghost" size="sm">
                             <Trash2 className="w-4 h-4" />
@@ -314,57 +314,55 @@ const HospitalRegistration = () => {
                         value={doctor.name}
                         onChange={(e) => updateDoctor(idx, 'name', e.target.value)}
                         required
-                        className="transition-all duration-500"
+                        className="transition-all duration-500 h-10 sm:h-11 text-sm"
                       />
                       <Input
                         placeholder="Specialization *"
                         value={doctor.specialization}
                         onChange={(e) => updateDoctor(idx, 'specialization', e.target.value)}
                         required
-                        className="transition-all duration-500"
+                        className="transition-all duration-500 h-10 sm:h-11 text-sm"
                       />
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
                         <Input
                           type="number"
-                          placeholder="Experience (years) *"
+                          placeholder="Exp (yrs) *"
                           value={doctor.experience}
                           onChange={(e) => updateDoctor(idx, 'experience', e.target.value)}
                           required
                           min="0"
-                          className="transition-all duration-500"
+                          className="transition-all duration-500 h-10 sm:h-11 text-sm"
                         />
                         <Input
-                          placeholder="Shift Timings *"
+                          placeholder="Shift *"
                           value={doctor.shift_timings}
                           onChange={(e) => updateDoctor(idx, 'shift_timings', e.target.value)}
                           required
-                          className="transition-all duration-500"
+                          className="transition-all duration-500 h-10 sm:h-11 text-sm"
                         />
                       </div>
                     </div>
                   ))}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Total Nurses *</Label>
-                      <Input
-                        data-testid="nurses-count-input"
-                        type="number"
-                        value={formData.nurses_count}
-                        onChange={(e) => setFormData({...formData, nurses_count: e.target.value})}
-                        required
-                        min="0"
-                        className="h-12 rounded-lg transition-all duration-500"
-                      />
-                    </div>
+                  <div>
+                    <Label className="text-sm">Total Nurses *</Label>
+                    <Input
+                      data-testid="nurses-count-input"
+                      type="number"
+                      value={formData.nurses_count}
+                      onChange={(e) => setFormData({...formData, nurses_count: e.target.value})}
+                      required
+                      min="0"
+                      className="h-11 sm:h-12 rounded-lg transition-all duration-500 text-sm"
+                    />
                   </div>
                 </div>
               )}
 
               {step === 3 && (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4">
                     <div>
-                      <Label>Total Rooms *</Label>
+                      <Label className="text-xs sm:text-sm">Rooms *</Label>
                       <Input
                         data-testid="total-rooms-input"
                         type="number"
@@ -372,11 +370,11 @@ const HospitalRegistration = () => {
                         onChange={(e) => setFormData({...formData, total_rooms: e.target.value})}
                         required
                         min="0"
-                        className="h-12 rounded-lg transition-all duration-500"
+                        className="h-10 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                       />
                     </div>
                     <div>
-                      <Label>ICU Beds *</Label>
+                      <Label className="text-xs sm:text-sm">ICU Beds *</Label>
                       <Input
                         data-testid="icu-beds-input"
                         type="number"
@@ -384,11 +382,11 @@ const HospitalRegistration = () => {
                         onChange={(e) => setFormData({...formData, icu_beds: e.target.value})}
                         required
                         min="0"
-                        className="h-12 rounded-lg transition-all duration-500"
+                        className="h-10 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                       />
                     </div>
                     <div>
-                      <Label>Operation Theatres *</Label>
+                      <Label className="text-xs sm:text-sm">OT *</Label>
                       <Input
                         data-testid="operation-theatres-input"
                         type="number"
@@ -396,7 +394,7 @@ const HospitalRegistration = () => {
                         onChange={(e) => setFormData({...formData, operation_theatres: e.target.value})}
                         required
                         min="0"
-                        className="h-12 rounded-lg transition-all duration-500"
+                        className="h-10 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                       />
                     </div>
                   </div>
@@ -407,25 +405,25 @@ const HospitalRegistration = () => {
                       checked={formData.has_emergency_dept}
                       onCheckedChange={(checked) => setFormData({...formData, has_emergency_dept: checked})}
                     />
-                    <Label htmlFor="has_emergency_dept" className="cursor-pointer">Has Emergency Department</Label>
+                    <Label htmlFor="has_emergency_dept" className="cursor-pointer text-sm">Has Emergency Department</Label>
                   </div>
                   <div>
-                    <Label>Services (MRI, CT, Physiotherapy, etc.)</Label>
+                    <Label className="text-sm">Services (MRI, CT, Physiotherapy, etc.)</Label>
                     <div className="flex gap-2 mt-2">
                       <Input
                         data-testid="service-input"
                         value={serviceInput}
                         onChange={(e) => setServiceInput(e.target.value)}
                         placeholder="Add a service"
-                        className="h-12 rounded-lg transition-all duration-500"
+                        className="h-10 sm:h-12 rounded-lg transition-all duration-500 text-sm"
                       />
-                      <Button data-testid="add-service-button" type="button" onClick={addService}>
+                      <Button data-testid="add-service-button" type="button" onClick={addService} className="px-3 sm:px-4">
                         <Plus className="w-4 h-4" />
                       </Button>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
                       {formData.services.map((service, idx) => (
-                        <div key={idx} data-testid={`service-${idx}`} className="px-3 py-1 bg-teal-100 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 rounded-full text-sm flex items-center gap-2 transition-colors duration-500">
+                        <div key={idx} data-testid={`service-${idx}`} className="px-2 sm:px-3 py-1 bg-teal-100 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 rounded-full text-xs sm:text-sm flex items-center gap-1 sm:gap-2 transition-colors duration-500">
                           {service}
                           <button type="button" onClick={() => removeService(idx)}>
                             <Trash2 className="w-3 h-3" />
@@ -437,18 +435,18 @@ const HospitalRegistration = () => {
                 </div>
               )}
 
-              <div className="flex gap-4 mt-8">
+              <div className="flex gap-2 sm:gap-4 mt-6 sm:mt-8">
                 {step > 1 && (
-                  <Button data-testid="back-step-button" type="button" onClick={() => setStep(step - 1)} variant="outline" className="flex-1">
+                  <Button data-testid="back-step-button" type="button" onClick={() => setStep(step - 1)} variant="outline" className="flex-1 py-5 sm:py-6 text-sm">
                     Back
                   </Button>
                 )}
                 {step < 3 ? (
-                  <Button data-testid="next-step-button" type="button" onClick={() => setStep(step + 1)} className="flex-1">
+                  <Button data-testid="next-step-button" type="button" onClick={() => setStep(step + 1)} className="flex-1 py-5 sm:py-6 text-sm">
                     Next
                   </Button>
                 ) : (
-                  <Button data-testid="submit-hospital-button" type="submit" disabled={loading} className="flex-1">
+                  <Button data-testid="submit-hospital-button" type="submit" disabled={loading} className="flex-1 py-5 sm:py-6 text-sm">
                     {loading ? 'Registering...' : 'Register Hospital'}
                   </Button>
                 )}
