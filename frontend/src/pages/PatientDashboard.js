@@ -9,8 +9,8 @@ import api from '../utils/api';
 import { toast } from 'sonner';
 import { 
   Stethoscope, Loader2, Phone, MapPin, Clock, CheckCircle, Navigation, 
-  CreditCard, X, Plus, History, ChevronRight, IndianRupee, Calendar,
-  MessageSquarePlus, Menu, ChevronLeft
+  CreditCard, X, Plus, History, ChevronRight, Calendar,
+  MessageSquarePlus, Menu, Search, Globe
 } from 'lucide-react';
 import PaymentGateway from '../components/PaymentGateway';
 
@@ -35,6 +35,11 @@ const PatientDashboard = () => {
   const [billBreakdown, setBillBreakdown] = useState(null);
   const pollIntervalRef = useRef(null);
 
+  // Web search state
+  const [webDoctors, setWebDoctors] = useState([]);
+  const [loadingWebSearch, setLoadingWebSearch] = useState(false);
+  const [showWebDoctors, setShowWebDoctors] = useState(false);
+
   // Check screen size
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -55,10 +60,19 @@ const PatientDashboard = () => {
 
   const loadHistory = async () => {
     try {
+      // Skip loading history for unauthenticated users
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setConsultationHistory([]);
+        setLoadingHistory(false);
+        return;
+      }
+
       const response = await api.get('/patient/history');
       setConsultationHistory(response.data || []);
     } catch (error) {
       console.error('Failed to load history:', error);
+      setConsultationHistory([]);
     } finally {
       setLoadingHistory(false);
     }
@@ -79,6 +93,8 @@ const PatientDashboard = () => {
     setShowPaymentGateway(false);
     setTotalAmount(550);
     setBillBreakdown(null);
+    setWebDoctors([]);
+    setShowWebDoctors(false);
     if (isMobile) setSidebarOpen(false);
   };
 
@@ -178,11 +194,69 @@ const PatientDashboard = () => {
     setShowPaymentGateway(true);
   };
 
-  const handlePaymentSuccess = (paymentData) => {
+  const handlePaymentSuccess = () => {
     setShowPaymentGateway(false);
     toast.success(`Payment successful!`);
     loadHistory();
     startNewSession();
+  };
+
+  const handleSearchFromWeb = async () => {
+    if (!symptomDescription.trim()) {
+      toast.error('Please describe your symptoms first');
+      return;
+    }
+
+    setLoadingWebSearch(true);
+    try {
+      const response = await api.post('/search/doctors/hybrid', {
+        symptoms: symptomDescription,
+        location: 'India', // Default location, could be made dynamic
+        limit: 10
+      });
+
+      const webDoctorsOnly = response.data.doctors.filter(doc => doc.source === 'web_search');
+      setWebDoctors(webDoctorsOnly);
+      setShowWebDoctors(true);
+      toast.success(`Found ${webDoctorsOnly.length} doctors from web search!`);
+    } catch (error) {
+      toast.error('Failed to search doctors from web');
+      console.error('Web search error:', error);
+    } finally {
+      setLoadingWebSearch(false);
+    }
+  };
+
+  const handleConnectWebDoctor = async (doctor) => {
+    try {
+      // Check if user is authenticated
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        // Redirect to signup/login page
+        toast.info('Please sign up or login to connect with doctors');
+        window.location.href = '/signup';
+        return;
+      }
+
+      // If authenticated, proceed with connection
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const patientName = user.full_name || 'Patient';
+      const patientPhone = user.phone || '';
+
+      const response = await api.post('/connect/doctor/web', {
+        patient_name: patientName,
+        patient_phone: patientPhone,
+        symptoms: symptomDescription,
+        doctor_name: doctor.name,
+        doctor_phone: doctor.mobile
+      });
+
+      toast.success('Connection request sent! You can contact the doctor directly.');
+    } catch (error) {
+      toast.error('Failed to connect with doctor');
+      console.error('Connect error:', error);
+    }
   };
 
   const getStatusDisplay = () => {
@@ -585,6 +659,112 @@ const PatientDashboard = () => {
                           </div>
                         ))}
                       </div>
+                      
+                      {/* Search from Web Button */}
+                      <div className="mt-4 pt-4 border-t">
+                        <Button 
+                          onClick={handleSearchFromWeb}
+                          disabled={loadingWebSearch}
+                          variant="outline" 
+                          className="w-full rounded-full"
+                        >
+                          {loadingWebSearch ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Searching web...
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="w-4 h-4 mr-2" />
+                              Search More Doctors from Web
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Web Doctors List */}
+                {showWebDoctors && webDoctors.length > 0 && (
+                  <Card className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300 text-lg">
+                        <Globe className="w-5 h-5" />
+                        Doctors from Web ({webDoctors.length})
+                      </CardTitle>
+                      <CardDescription className="text-orange-600 dark:text-orange-400 text-sm">
+                        These doctors were found through web search. Contact them directly.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {webDoctors.map((doctor, index) => (
+                          <div key={index} className="bg-white dark:bg-slate-800 rounded-lg p-4 border">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-base">Dr. {doctor.name}</h3>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">{doctor.specialization}</p>
+                                {doctor.experience && (
+                                  <p className="text-xs text-slate-500 mt-1">{doctor.experience}</p>
+                                )}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2 text-sm">
+                                  {doctor.mobile && (
+                                    <a href={`tel:${doctor.mobile}`} className="flex items-center gap-1 text-orange-600">
+                                      <Phone className="w-4 h-4" />
+                                      {doctor.mobile}
+                                    </a>
+                                  )}
+                                  {doctor.location && (
+                                    <span className="flex items-center gap-1 text-slate-500 truncate">
+                                      <MapPin className="w-4 h-4 flex-shrink-0" />
+                                      {doctor.location}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Button 
+                                onClick={() => handleConnectWebDoctor(doctor)}
+                                size="sm"
+                                className="ml-3 bg-orange-600 hover:bg-orange-700 text-white"
+                              >
+                                Connect
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* No Doctors Found - Show Web Search Option */}
+                {!assignedDoctor && matchedDoctors && matchedDoctors.length === 0 && (
+                  <Card className="border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-amber-700 dark:text-amber-300 text-lg">No Registered Doctors Available</CardTitle>
+                      <CardDescription className="text-amber-600 dark:text-amber-400">
+                        Try searching for doctors from the web instead.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button 
+                        onClick={handleSearchFromWeb}
+                        disabled={loadingWebSearch}
+                        className="w-full rounded-full bg-amber-600 hover:bg-amber-700"
+                      >
+                        {loadingWebSearch ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Searching web...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="w-4 h-4 mr-2" />
+                            Search Doctors from Web
+                          </>
+                        )}
+                      </Button>
                     </CardContent>
                   </Card>
                 )}

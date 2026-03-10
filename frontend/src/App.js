@@ -43,14 +43,8 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute allowedRoles={['patient']}>
-                  <PatientDashboard />
-                </PrivateRoute>
-              }
-            />
+            {/* Patient dashboard - NO AUTH REQUIRED */}
+            <Route path="/dashboard" element={<PatientDashboard />} />
             <Route
               path="/doctor-dashboard"
               element={
@@ -61,11 +55,7 @@ function App() {
             />
             <Route
               path="/results"
-              element={
-                <PrivateRoute allowedRoles={['patient']}>
-                  <ResultsPage />
-                </PrivateRoute>
-              }
+              element={<ResultsPage />}
             />
             <Route
               path="/clinic-registration"

@@ -27,9 +27,9 @@ const LandingPage = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-              <Link to="/signup">
-                <Button data-testid="get-started-button" size="lg" className="rounded-full px-8 py-6 text-lg font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
-                  Get Started <ArrowRight className="ml-2 w-5 h-5" />
+              <Link to="/dashboard">
+                <Button data-testid="search-doctors-button" size="lg" className="rounded-full px-8 py-6 text-lg font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+                  Search Doctors <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
               <Link to="/login">

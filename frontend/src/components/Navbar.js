@@ -39,11 +39,6 @@ const Navbar = () => {
                     <Button variant="ghost" size="sm">Dashboard</Button>
                   </Link>
                 )}
-                {user?.role === 'patient' && (
-                  <Link to="/dashboard" data-testid="dashboard-link">
-                    <Button variant="ghost" size="sm">Dashboard</Button>
-                  </Link>
-                )}
                 {user?.role === 'clinic_admin' && (
                   <Link to="/clinic-registration" data-testid="dashboard-link">
                     <Button variant="ghost" size="sm">Clinic</Button>
@@ -65,6 +60,9 @@ const Navbar = () => {
               </>
             ) : (
               <>
+                <Link to="/dashboard" data-testid="search-doctors-link">
+                  <Button variant="ghost" size="sm">Search Doctors</Button>
+                </Link>
                 <Link to="/login" data-testid="login-link">
                   <Button variant="ghost" size="sm">Login</Button>
                 </Link>
@@ -117,11 +115,6 @@ const Navbar = () => {
                     <Button variant="ghost" className="w-full justify-start">Dashboard</Button>
                   </Link>
                 )}
-                {user?.role === 'patient' && (
-                  <Link to="/dashboard" onClick={closeMenu} className="block">
-                    <Button variant="ghost" className="w-full justify-start">Dashboard</Button>
-                  </Link>
-                )}
                 {user?.role === 'clinic_admin' && (
                   <Link to="/clinic-registration" onClick={closeMenu} className="block">
                     <Button variant="ghost" className="w-full justify-start">Clinic Management</Button>
@@ -140,6 +133,9 @@ const Navbar = () => {
               </>
             ) : (
               <>
+                <Link to="/dashboard" onClick={closeMenu} className="block">
+                  <Button variant="ghost" className="w-full">Search Doctors</Button>
+                </Link>
                 <Link to="/login" onClick={closeMenu} className="block">
                   <Button variant="ghost" className="w-full">Login</Button>
                 </Link>

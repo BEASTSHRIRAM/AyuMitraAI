@@ -1,5 +1,6 @@
 
-from langchain_cerebras import ChatCerebras
+from google import genai
+from langsmith import traceable
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -7,11 +8,22 @@ from langchain_core.messages import HumanMessage
 import json
 import os
 import sys
+import asyncio
 
 sys.path.append(os.path.dirname(__file__))
 from config import get_settings
 
 settings = get_settings()
+
+# Enable LangSmith tracing
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_ENDPOINT"] = settings.LANGSMITH_ENDPOINT
+os.environ["LANGSMITH_API_KEY"] = settings.LANGSMITH_API_KEY
+os.environ["LANGSMITH_PROJECT"] = settings.LANGSMITH_PROJECT
+
+# Set Google API key (try both environment variable names for compatibility)
+google_api_key = settings.GOOGLE_API_KEY or settings.GOOGLE_GEMINI_API_KEY
+os.environ["GOOGLE_API_KEY"] = google_api_key
 
 @tool
 def analyze_symptom_severity(symptoms: str, patient_age: int = None) -> dict:
@@ -90,16 +102,12 @@ def get_treatment_guidelines(specialty: str, condition: str) -> dict:
 class MedicalRoutingAgent:
     """
     AI Agent that routes patients to appropriate doctors/facilities
-    using LangChain and Cerebras AI.
+    using Google Gemini with LangSmith tracing.
     """
     
     def __init__(self):
-        self.llm = ChatCerebras(
-            model="llama-3.3-70b",
-            api_key=settings.CEREBRAS_API_KEY,
-            temperature=0.3,
-            max_tokens=2000
-        )
+        # Create Gemini client directly (no wrapper needed)
+        self.client = genai.Client()
         
         # Define tools
         self.tools = [
@@ -110,12 +118,22 @@ class MedicalRoutingAgent:
             estimate_wait_time,
             get_treatment_guidelines
         ]
-        
-        # Create agent
-        self.agent = self._create_agent()
     
-    def _create_agent(self):
-        """Create the routing agent with tools"""
+    @traceable(name="route_patient")
+    async def route_patient(self, symptoms: str, patient_age: int = None, 
+                           medical_history: str = None) -> dict:
+        """
+        Route a patient to appropriate medical care using Gemini.
+        
+        Args:
+            symptoms: Description of patient symptoms
+            patient_age: Patient's age (optional)
+            medical_history: Relevant medical history (optional)
+        
+        Returns:
+            Routing recommendation with specialty, facility, and reasoning
+        """
+        
         system_prompt = """You are an expert medical routing AI agent for AyuMitraAI.
 Your role is to:
 1. Analyze patient symptoms and medical history
@@ -128,30 +146,6 @@ Your role is to:
 Always prioritize patient safety and ensure critical cases are routed to emergency services.
 Be thorough in your analysis and consider multiple factors before making recommendations."""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
-        
-        agent = create_tool_calling_agent(self.llm, self.tools, prompt)
-        return AgentExecutor(agent=agent, tools=self.tools, verbose=True)
-    
-    async def route_patient(self, symptoms: str, patient_age: int = None, 
-                           medical_history: str = None) -> dict:
-        """
-        Route a patient to appropriate medical care.
-        
-        Args:
-            symptoms: Description of patient symptoms
-            patient_age: Patient's age (optional)
-            medical_history: Relevant medical history (optional)
-        
-        Returns:
-            Routing recommendation with specialty, facility, and reasoning
-        """
-        
         input_message = f"""
 Patient Symptoms: {symptoms}
 {f'Age: {patient_age}' if patient_age else ''}
@@ -164,17 +158,20 @@ Please analyze this patient and provide:
 4. Estimated wait time
 5. Next steps for the patient
 """
+
+        full_prompt = f"{system_prompt}\n\n{input_message}"
         
         try:
-            result = self.agent.invoke({
-                "input": input_message,
-                "chat_history": [],
-                "agent_scratchpad": ""
-            })
+            # Make a traced Gemini call with async wrapper
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model="gemini-2.0-flash-exp",
+                contents=full_prompt,
+            )
             
             return {
                 "status": "success",
-                "routing_decision": result.get("output", ""),
+                "routing_decision": response.text,
                 "reasoning": "Agent analysis complete"
             }
         except Exception as e:
@@ -195,22 +192,18 @@ class TriageAgent:
     """
     
     def __init__(self):
-        self.llm = ChatCerebras(
-            model="llama-3.3-70b",
-            api_key=settings.CEREBRAS_API_KEY,
-            temperature=0.2,
-            max_tokens=1500
-        )
-        
-        self.tools = [
-            analyze_symptom_severity,
-            get_treatment_guidelines
-        ]
-        
-        self.agent = self._create_agent()
+        # Create Gemini client directly (no wrapper needed)
+        self.client = genai.Client()
     
-    def _create_agent(self):
-        """Create the triage agent"""
+    @traceable(name="triage_patient")
+    async def triage_patient(self, symptoms: str) -> dict:
+        """
+        Perform initial triage assessment.
+        
+        Returns:
+            Triage level and recommendations
+        """
+        
         system_prompt = """You are a medical triage AI agent.
 Your role is to:
 1. Quickly assess patient symptoms
@@ -231,22 +224,6 @@ CRITICAL RED FLAGS (Always recommend emergency):
 
 Be conservative - when in doubt, recommend emergency care."""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{input}"),
-        ])
-        
-        agent = create_tool_calling_agent(self.llm, self.tools, prompt)
-        return AgentExecutor(agent=agent, tools=self.tools, verbose=True)
-    
-    async def triage_patient(self, symptoms: str) -> dict:
-        """
-        Perform initial triage assessment.
-        
-        Returns:
-            Triage level and recommendations
-        """
-        
         input_message = f"""
 Patient reports: {symptoms}
 
@@ -256,12 +233,18 @@ Perform triage assessment and provide:
 3. Immediate actions needed
 4. Recommended care level
 """
+
+        full_prompt = f"{system_prompt}\n\n{input_message}"
         
         try:
-            result = self.agent.invoke({"input": input_message})
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model="gemini-2.0-flash-exp",
+                contents=full_prompt,
+            )
             return {
                 "status": "success",
-                "triage_assessment": result.get("output", "")
+                "triage_assessment": response.text
             }
         except Exception as e:
             return {
@@ -280,13 +263,10 @@ class PrescriptionAnalysisAgent:
     """
     
     def __init__(self):
-        self.llm = ChatCerebras(
-            model="llama-3.3-70b",
-            api_key=settings.CEREBRAS_API_KEY,
-            temperature=0.2,
-            max_tokens=1500
-        )
+        # Create Gemini client directly (no wrapper needed)
+        self.client = genai.Client()
     
+    @traceable(name="analyze_prescription")
     async def analyze_prescription(self, medications: list, patient_age: int = None,
                                    allergies: list = None) -> dict:
         """
@@ -318,10 +298,14 @@ Provide:
 IMPORTANT: This is for informational purposes only. Always consult with a pharmacist or doctor."""
 
         try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model="gemini-2.0-flash-exp",
+                contents=prompt,
+            )
             return {
                 "status": "success",
-                "analysis": response.content
+                "analysis": response.text
             }
         except Exception as e:
             return {
@@ -340,13 +324,10 @@ class FollowUpCareAgent:
     """
     
     def __init__(self):
-        self.llm = ChatCerebras(
-            model="llama-3.3-70b",
-            api_key=settings.CEREBRAS_API_KEY,
-            temperature=0.3,
-            max_tokens=1500
-        )
+        # Create Gemini client directly (no wrapper needed)
+        self.client = genai.Client()
     
+    @traceable(name="generate_followup_plan")
     async def generate_followup_plan(self, condition: str, treatment: str,
                                      patient_age: int = None) -> dict:
         """
@@ -374,10 +355,14 @@ Provide:
 8. When to seek emergency care"""
 
         try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model="gemini-2.0-flash-exp",
+                contents=prompt,
+            )
             return {
                 "status": "success",
-                "followup_plan": response.content
+                "followup_plan": response.text
             }
         except Exception as e:
             return {
@@ -396,13 +381,10 @@ class HealthMonitoringAgent:
     """
     
     def __init__(self):
-        self.llm = ChatCerebras(
-            model="llama-3.3-70b",
-            api_key=settings.CEREBRAS_API_KEY,
-            temperature=0.2,
-            max_tokens=1500
-        )
+        # Create Gemini client directly (no wrapper needed)
+        self.client = genai.Client()
     
+    @traceable(name="analyze_vitals")
     async def analyze_vitals(self, vitals: dict, baseline: dict = None) -> dict:
         """
         Analyze vital signs for concerning trends.
@@ -436,10 +418,14 @@ Reference Ranges:
 - Respiratory Rate: 12-20 breaths/min (normal)"""
 
         try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model="gemini-2.0-flash-exp",
+                contents=prompt,
+            )
             return {
                 "status": "success",
-                "vitals_analysis": response.content
+                "vitals_analysis": response.text
             }
         except Exception as e:
             return {
@@ -458,13 +444,10 @@ class MedicationReminderAgent:
     """
     
     def __init__(self):
-        self.llm = ChatCerebras(
-            model="llama-3.3-70b",
-            api_key=settings.CEREBRAS_API_KEY,
-            temperature=0.3,
-            max_tokens=1000
-        )
+        # Create Gemini client directly (no wrapper needed)
+        self.client = genai.Client()
     
+    @traceable(name="create_medication_schedule")
     async def create_medication_schedule(self, medications: list) -> dict:
         """
         Create optimized medication schedule.
@@ -490,10 +473,14 @@ Provide:
 6. Tips for remembering to take medications"""
 
         try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model="gemini-2.0-flash-exp",
+                contents=prompt,
+            )
             return {
                 "status": "success",
-                "medication_schedule": response.content
+                "medication_schedule": response.text
             }
         except Exception as e:
             return {

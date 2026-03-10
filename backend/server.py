@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timezone
+from langsmith import traceable
 import os
 import sys
 import uuid
@@ -11,7 +12,7 @@ sys.path.append(os.path.dirname(__file__))
 from config import get_settings
 from models import *
 from auth import hash_password, verify_password, create_access_token, get_current_user
-from cerebras_service import CerebrasSymptomAnalyzer
+from gemini_service import GeminiSymptomAnalyzer
 
 settings = get_settings()
 
@@ -21,7 +22,7 @@ db = client[settings.DB_NAME]
 app = FastAPI(title="AyuMitraAI API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
 
-cerebras_analyzer = CerebrasSymptomAnalyzer()
+gemini_analyzer = GeminiSymptomAnalyzer()
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,17 +87,19 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**user)
 
 @api_router.post("/connect-with-doctor")
-async def connect_with_doctor(request: SymptomAnalysisRequest, current_user: dict = Depends(get_current_user)):
-    """Connect patient with available doctors based on symptoms"""
+@traceable(name="connect_with_doctor_endpoint")
+async def connect_with_doctor(request: SymptomAnalysisRequest):
+    """Connect patient with available doctors based on symptoms - NO AUTH REQUIRED"""
     start_time = time.time()
     request_id = str(uuid.uuid4())
     
     try:
-        # Get patient info
-        patient = await db.users.find_one({"user_id": current_user["sub"]})
+        # Create temporary patient ID if not authenticated
+        temp_patient_id = f"temp_{uuid.uuid4()}"
+        patient_name = request.patient_name if hasattr(request, 'patient_name') else "Anonymous Patient"
         
         # Analyze symptoms to get specialty
-        analysis = await cerebras_analyzer.analyze_symptoms(
+        analysis = await gemini_analyzer.analyze_symptoms(
             request.symptom_description,
             request.patient_age
         )
@@ -113,17 +116,17 @@ async def connect_with_doctor(request: SymptomAnalysisRequest, current_user: dic
             reasons=analysis["primary_reasons"]
         )
         
-        # Find matching doctors (not just facilities)
+        # Find matching doctors
         matching_doctors = await find_matching_doctors(
             analysis["primary_specialty"],
             urgency.level
         )
         
-        # Create patient request for each matching doctor
+        # Create patient request
         patient_request_doc = {
             "request_id": request_id,
-            "patient_id": current_user["sub"],
-            "patient_name": patient.get("full_name", "Patient"),
+            "patient_id": temp_patient_id,
+            "patient_name": patient_name,
             "patient_age": request.patient_age,
             "symptoms": request.symptom_description,
             "urgency_level": urgency.level,
@@ -142,7 +145,7 @@ async def connect_with_doctor(request: SymptomAnalysisRequest, current_user: dic
                 "notification_id": str(uuid.uuid4()),
                 "doctor_id": doctor["doctor_id"],
                 "patient_request_id": request_id,
-                "patient_name": patient.get("full_name", "Patient"),
+                "patient_name": patient_name,
                 "symptoms": request.symptom_description,
                 "urgency_level": urgency.level,
                 "created_at": datetime.now(timezone.utc).isoformat(),
@@ -172,10 +175,11 @@ async def connect_with_doctor(request: SymptomAnalysisRequest, current_user: dic
         raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
 
 @api_router.get("/patient/request-status/{request_id}")
-async def get_request_status(request_id: str, current_user: dict = Depends(get_current_user)):
-    """Get status of patient's doctor connection request"""
+@api_router.get("/patient/request-status/{request_id}")
+async def get_request_status(request_id: str):
+    """Get status of patient's doctor connection request - NO AUTH REQUIRED"""
     request_doc = await db.patient_requests.find_one(
-        {"request_id": request_id, "patient_id": current_user["sub"]},
+        {"request_id": request_id},
         {"_id": 0}
     )
     
@@ -223,11 +227,14 @@ async def get_request_status(request_id: str, current_user: dict = Depends(get_c
     }
 
 @api_router.get("/patient/history")
-async def get_patient_history(current_user: dict = Depends(get_current_user)):
-    """Get patient's consultation history"""
+async def get_patient_history(patient_id: str = None):
+    """Get patient's consultation history - Optional auth"""
+    if not patient_id:
+        return []
+    
     # Get patient requests
     requests = await db.patient_requests.find(
-        {"patient_id": current_user["sub"]},
+        {"patient_id": patient_id},
         {"_id": 0}
     ).sort("requested_at", -1).limit(50).to_list(50)
     
@@ -264,7 +271,7 @@ async def analyze_symptoms(request: SymptomAnalysisRequest, current_user: dict =
     request_id = str(uuid.uuid4())
     
     try:
-        analysis = await cerebras_analyzer.analyze_symptoms(
+        analysis = await gemini_analyzer.analyze_symptoms(
             request.symptom_description,
             request.patient_age
         )
@@ -910,6 +917,204 @@ async def debug_doctors():
             }
             for d in all_doctors
         ]
+    }
+
+# ============================================================================
+# HYBRID DOCTOR SEARCH ENDPOINTS (Registered + Web Scraped)
+# ============================================================================
+
+@api_router.post("/search/doctors/hybrid")
+@traceable(name="search_doctors_hybrid_endpoint")
+async def search_doctors_hybrid(request: dict):
+    """
+    Search for doctors from both registered database and web scraping.
+    
+    Request body:
+    {
+        "symptoms": "description of symptoms",
+        "location": "city or area name",
+        "latitude": 28.7041,
+        "longitude": 77.1025,
+        "limit": 10
+    }
+    """
+    from gemini_service import GeminiSymptomAnalyzer
+    from doctor_scraper import get_doctor_scraper
+    
+    symptoms = request.get("symptoms", "")
+    location = request.get("location", "")
+    latitude = request.get("latitude")
+    longitude = request.get("longitude")
+    limit = request.get("limit", 10)
+    
+    if not symptoms:
+        raise HTTPException(status_code=400, detail="Symptoms are required")
+    
+    # Step 1: Analyze symptoms with Gemini
+    analyzer = GeminiSymptomAnalyzer()
+    analysis = await analyzer.analyze_symptoms(symptoms)
+    
+    specialty = analysis.get("primary_specialty", "General Medicine")
+    urgency = analysis.get("urgency_level", "moderate")
+    
+    # Step 2: Find registered doctors
+    registered_doctors = await find_matching_doctors(specialty, urgency)
+    
+    # Step 3: Web scrape for non-registered doctors
+    scraper = get_doctor_scraper()
+    scraped_doctors = await scraper.search_doctors(specialty, location, limit=5)
+    
+    # Format registered doctors
+    formatted_registered = [
+        {
+            "source": "registered",
+            "doctor_id": d.get("doctor_id"),
+            "name": d.get("full_name"),
+            "specialization": d.get("specialization"),
+            "experience": d.get("experience_years"),
+            "mobile": d.get("phone"),
+            "location": d.get("location", {}).get("address", ""),
+            "is_online": d.get("availability", {}).get("is_online", False),
+            "rating": d.get("rating", 0),
+            "fees": d.get("consultation_fee", 0)
+        }
+        for d in registered_doctors
+    ]
+    
+    # Format scraped doctors
+    formatted_scraped = [
+        {
+            "source": "web_search",
+            "name": d.get("name"),
+            "specialization": d.get("specialty"),
+            "designation": d.get("designation"),
+            "mobile": d.get("mobile"),
+            "location": d.get("location"),
+            "experience": d.get("experience"),
+            "link": d.get("link", "")
+        }
+        for d in scraped_doctors
+    ]
+    
+    # Combine and sort by relevance
+    all_doctors = formatted_registered + formatted_scraped
+    
+    return {
+        "status": "success",
+        "symptom_analysis": {
+            "urgency_level": urgency,
+            "urgency_score": analysis.get("urgency_score"),
+            "primary_specialty": specialty,
+            "key_symptoms": analysis.get("key_symptoms", []),
+            "critical_warnings": analysis.get("critical_warnings", [])
+        },
+        "registered_doctors_count": len(formatted_registered),
+        "web_doctors_count": len(formatted_scraped),
+        "doctors": all_doctors[:limit]
+    }
+
+@api_router.post("/search/doctors/registered")
+async def search_registered_doctors(request: dict):
+    """
+    Search only registered doctors by specialty and location.
+    """
+    specialty = request.get("specialty", "")
+    location = request.get("location", "")
+    
+    if not specialty:
+        raise HTTPException(status_code=400, detail="Specialty is required")
+    
+    doctors = await find_matching_doctors(specialty, "moderate")
+    
+    return {
+        "status": "success",
+        "count": len(doctors),
+        "doctors": [
+            {
+                "doctor_id": d.get("doctor_id"),
+                "name": d.get("full_name"),
+                "specialization": d.get("specialization"),
+                "experience": d.get("experience_years"),
+                "mobile": d.get("phone"),
+                "location": d.get("location", {}).get("address", ""),
+                "is_online": d.get("availability", {}).get("is_online", False),
+                "rating": d.get("rating", 0),
+                "fees": d.get("consultation_fee", 0)
+            }
+            for d in doctors
+        ]
+    }
+
+@api_router.post("/search/doctors/web")
+async def search_web_doctors(request: dict):
+    """
+    Search for doctors from web scraping only.
+    """
+    from doctor_scraper import get_doctor_scraper
+    
+    specialty = request.get("specialty", "")
+    location = request.get("location", "")
+    limit = request.get("limit", 10)
+    
+    if not specialty or not location:
+        raise HTTPException(status_code=400, detail="Specialty and location are required")
+    
+    scraper = get_doctor_scraper()
+    doctors = await scraper.search_doctors(specialty, location, limit=limit)
+    
+    return {
+        "status": "success",
+        "count": len(doctors),
+        "doctors": [
+            {
+                "name": d.get("name"),
+                "specialization": d.get("specialty"),
+                "designation": d.get("designation"),
+                "mobile": d.get("mobile"),
+                "location": d.get("location"),
+                "experience": d.get("experience"),
+                "link": d.get("link", "")
+            }
+            for d in doctors
+        ]
+    }
+
+@api_router.post("/connect/doctor/web")
+async def connect_with_web_doctor(request: dict):
+    """
+    Connect patient with a web-scraped (non-registered) doctor.
+    No authentication required - patient info is temporary.
+    """
+    patient_name = request.get("patient_name", "")
+    patient_phone = request.get("patient_phone", "")
+    symptoms = request.get("symptoms", "")
+    doctor_name = request.get("doctor_name", "")
+    doctor_phone = request.get("doctor_phone", "")
+    
+    if not all([patient_name, patient_phone, symptoms, doctor_name, doctor_phone]):
+        raise HTTPException(status_code=400, detail="All fields are required")
+    
+    # Create temporary connection record
+    connection = {
+        "connection_id": str(uuid.uuid4()),
+        "patient_name": patient_name,
+        "patient_phone": patient_phone,
+        "symptoms": symptoms,
+        "doctor_name": doctor_name,
+        "doctor_phone": doctor_phone,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": "web_search"
+    }
+    
+    await db.web_doctor_connections.insert_one(connection)
+    
+    return {
+        "status": "success",
+        "message": "Connection request sent to doctor",
+        "connection_id": connection["connection_id"],
+        "doctor_phone": doctor_phone,
+        "next_step": "Doctor will contact you shortly"
     }
 
 app.include_router(api_router)
