@@ -11,11 +11,6 @@ const LandingPage = () => {
         
         <div className="relative max-w-7xl mx-auto px-6 py-20">
           <div className="text-center space-y-8 max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-teal-100 dark:bg-teal-950/30 rounded-full text-teal-700 dark:text-teal-300 text-sm font-medium transition-colors duration-500">
-              <Activity className="w-4 h-4" />
-              AI-Powered Medical Routing
-            </div>
-            
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight" style={{ fontFamily: 'Manrope, sans-serif' }}>
               <span className="bg-gradient-to-r from-teal-600 to-sky-600 dark:from-teal-400 dark:to-sky-400 bg-clip-text text-transparent">AyuMitraAI</span>
               <br />
