@@ -19,7 +19,7 @@ langsmith>=0.1.17
 python-multipart==0.0.20
 email-validator==2.3.0
 
-google-generativeai==0.3.0
+google-generativeai==0.8.3
 google-genai>=1.56.0
 
 beautifulsoup4==4.12.2
