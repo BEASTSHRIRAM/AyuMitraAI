@@ -1,17 +1,32 @@
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+import re
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
     full_name: str
     role: Literal["patient", "doctor", "clinic_admin", "hospital_admin"] = "patient"
-    
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if not re.search(r"[A-Za-z]", value) or not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one letter and one digit")
+        return value
+
 class DoctorRegistration(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
     full_name: str
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if not re.search(r"[A-Za-z]", value) or not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one letter and one digit")
+        return value
     role: Literal["doctor"] = "doctor"
     facility_id: str = Field(description="Unique clinic or hospital ID")
     specialization: str
@@ -38,6 +53,11 @@ class SymptomAnalysisRequest(BaseModel):
     symptom_description: str = Field(min_length=10, max_length=2000)
     patient_age: Optional[int] = Field(None, ge=0, le=150)
     patient_location: Optional[dict] = None
+
+class CopilotTriageRequest(BaseModel):
+    symptom_description: str = Field(min_length=10, max_length=2000)
+    patient_age: Optional[int] = Field(None, ge=0, le=150)
+    location: Optional[str] = Field(None, max_length=120)
 
 class UrgencyLevel(BaseModel):
     level: Literal["critical", "moderate", "mild"]
