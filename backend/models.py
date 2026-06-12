@@ -54,6 +54,11 @@ class SymptomAnalysisRequest(BaseModel):
     patient_age: Optional[int] = Field(None, ge=0, le=150)
     patient_location: Optional[dict] = None
 
+class CopilotTriageRequest(BaseModel):
+    symptom_description: str = Field(min_length=10, max_length=2000)
+    patient_age: Optional[int] = Field(None, ge=0, le=150)
+    location: Optional[str] = Field(None, max_length=120)
+
 class UrgencyLevel(BaseModel):
     level: Literal["critical", "moderate", "mild"]
     score: float = Field(ge=0.0, le=1.0)

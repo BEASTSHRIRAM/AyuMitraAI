@@ -5,6 +5,7 @@ import { Toaster } from './components/ui/sonner';
 import { isAuthenticated, getUser } from './utils/auth';
 import Navbar from './components/Navbar';
 import LandingPage from './pages/LandingPage';
+import HealthCopilot from './pages/HealthCopilot';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import PatientDashboard from './pages/PatientDashboard';
@@ -41,6 +42,8 @@ function App() {
           <Navbar />
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            {/* Multi-agent Health Copilot - NO AUTH REQUIRED */}
+            <Route path="/copilot" element={<HealthCopilot />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             {/* Patient dashboard - NO AUTH REQUIRED */}

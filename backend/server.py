@@ -1,11 +1,13 @@
 from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timezone
 from langsmith import traceable
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+import json
 import logging
 import os
 import sys
@@ -23,6 +25,7 @@ from config import get_settings
 from models import *
 from auth import hash_password, verify_password, create_access_token, get_current_user
 from gemini_service import GeminiSymptomAnalyzer
+from triage_graph import HealthCopilotGraph
 
 settings = get_settings()
 
@@ -45,6 +48,7 @@ async def create_db_indexes():
     logger.info("MongoDB indexes ensured")
 
 gemini_analyzer = GeminiSymptomAnalyzer()
+health_copilot = HealthCopilotGraph()
 
 app.add_middleware(
     CORSMiddleware,
@@ -109,6 +113,37 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return UserResponse(**user)
+
+@api_router.post("/copilot/triage/stream")
+@limiter.limit("10/minute")
+async def copilot_triage_stream(request: Request, payload: CopilotTriageRequest):
+    """Multi-agent health copilot. Streams agent progress as Server-Sent Events."""
+    initial_state = {
+        "symptom_description": payload.symptom_description,
+        "patient_age": payload.patient_age,
+        "location": payload.location,
+    }
+
+    async def event_stream():
+        research_enabled = bool(payload.location) and health_copilot.scraper is not None
+        yield "data: " + json.dumps({"event": "start", "research_enabled": research_enabled}) + "\n\n"
+        try:
+            async for node_name, update in health_copilot.astream_events(initial_state):
+                yield "data: " + json.dumps(
+                    {"event": "agent_update", "agent": node_name, "data": update}, default=str
+                ) + "\n\n"
+        except Exception as exc:
+            logger.error("Copilot stream failed: %s", exc)
+            yield "data: " + json.dumps(
+                {"event": "error", "message": "Copilot pipeline failed. Please try again."}
+            ) + "\n\n"
+        yield "data: " + json.dumps({"event": "end"}) + "\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 @api_router.post("/connect-with-doctor")
 @traceable(name="connect_with_doctor_endpoint")
