@@ -1,12 +1,22 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timezone
 from langsmith import traceable
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+import logging
 import os
 import sys
 import uuid
 import time
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("ayumitra")
 
 sys.path.append(os.path.dirname(__file__))
 from config import get_settings
@@ -22,6 +32,18 @@ db = client[settings.DB_NAME]
 app = FastAPI(title="AyuMitraAI API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
 
+# Rate limiting for sensitive endpoints
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.on_event("startup")
+async def create_db_indexes():
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("user_id")
+    await db.patient_requests.create_index("request_id")
+    logger.info("MongoDB indexes ensured")
+
 gemini_analyzer = GeminiSymptomAnalyzer()
 
 app.add_middleware(
@@ -33,7 +55,8 @@ app.add_middleware(
 )
 
 @api_router.post("/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(user: UserCreate):
+@limiter.limit("5/minute")
+async def register(request: Request, user: UserCreate):
     existing_user = await db.users.find_one({"email": user.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -62,7 +85,8 @@ async def register(user: UserCreate):
     )
 
 @api_router.post("/auth/login", response_model=TokenResponse)
-async def login(credentials: UserLogin):
+@limiter.limit("5/minute")
+async def login(request: Request, credentials: UserLogin):
     user = await db.users.find_one({"email": credentials.email})
     if not user or not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
