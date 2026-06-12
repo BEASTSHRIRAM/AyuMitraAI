@@ -8,11 +8,12 @@ BACKEND_DIR = Path(__file__).parent
 class Settings(BaseSettings):
     MONGO_URL: str
     DB_NAME: str
-    CORS_ORIGINS: str = "*"
+    CORS_ORIGINS: str = "http://localhost:3000"
     GOOGLE_GEMINI_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""  # For the new google-genai library
     MAPPLES_API_KEY: str = ""
-    JWT_SECRET_KEY: str = "ayumitra-secret-key-change-in-production-2025"
+    CEREBRAS_API_KEY: str = ""
+    JWT_SECRET_KEY: str  # Required: must be set via environment, no insecure default
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 10080
     LANGSMITH_API_KEY: str = ""

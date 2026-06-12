@@ -32,6 +32,9 @@ const Navbar = () => {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-4">
+            <Link to="/copilot" data-testid="copilot-link">
+              <Button variant="ghost" size="sm">Health Copilot</Button>
+            </Link>
             {isAuthenticated() ? (
               <>
                 {user?.role === 'doctor' && (
@@ -102,6 +105,9 @@ const Navbar = () => {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-slate-200 dark:border-slate-700 pt-4 space-y-3">
+            <Link to="/copilot" onClick={closeMenu} className="block">
+              <Button variant="ghost" className="w-full justify-start">Health Copilot</Button>
+            </Link>
             {isAuthenticated() ? (
               <>
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
