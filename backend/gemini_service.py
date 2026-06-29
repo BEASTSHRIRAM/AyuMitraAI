@@ -101,7 +101,7 @@ Be thorough, accurate, and prioritize patient safety."""
             # Make a traced Gemini call using async wrapper for non-blocking execution
             response = await asyncio.to_thread(
                 self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
+                model="gemini-2.0-flash",
                 contents=full_prompt,
             )
             
@@ -117,15 +117,84 @@ Be thorough, accurate, and prioritize patient safety."""
             else:
                 raise ValueError("No JSON found in response")
         except Exception as e:
+            # Smart Rule-Based Backup Triage Classifier when API key has no quota/fails
+            symptom_lower = symptom_description.lower()
+            
+            # Default
+            specialty = "General Medicine"
+            urgency_level = "moderate"
+            urgency_score = 0.8
+            reasons = ["Keyword matching fallback"]
+            actions = ["Consult a general physician"]
+            warnings = [f"AI analysis bypassed/failed: {str(e)}"]
+
+            # Cardiology rules
+            if any(k in symptom_lower for k in ["heart", "chest pain", "cardiac", "palpitation", "angina", "chest pressure"]):
+                specialty = "Cardiology"
+                urgency_level = "critical"
+                urgency_score = 0.95
+                reasons = ["Symptoms indicate potential cardiac concern (heart/chest pain)"]
+                actions = ["Seek immediate medical attention", "Refrain from physical exertion"]
+                warnings = ["Potential heart attack risk. Go to the nearest emergency room if symptoms worsen."]
+            
+            # Neurology rules
+            elif any(k in symptom_lower for k in ["seizure", "stroke", "migraine", "severe headache", "numbness", "brain", "paralysis"]):
+                specialty = "Neurology"
+                urgency_level = "critical" if "stroke" in symptom_lower or "paralysis" in symptom_lower else "moderate"
+                urgency_score = 0.9
+                reasons = ["Symptoms point to neurological involvement"]
+                actions = ["Rest in a quiet room", "Monitor neurological responses"]
+            
+            # Orthopedics rules
+            elif any(k in symptom_lower for k in ["bone", "joint", "fracture", "spine", "back pain", "knee", "shoulder", "sprain"]):
+                specialty = "Orthopedics"
+                urgency_level = "moderate"
+                urgency_score = 0.85
+                reasons = ["Symptoms suggest bone or joint issues"]
+                actions = ["Avoid putting weight on the affected area", "Apply ice if swelling is present"]
+            
+            # Pulmonology rules
+            elif any(k in symptom_lower for k in ["breath", "lung", "cough", "asthma", "wheezing", "shortness of breath"]):
+                specialty = "Pulmonology"
+                urgency_level = "critical" if "shortness of breath" in symptom_lower or "breathing" in symptom_lower else "moderate"
+                urgency_score = 0.9
+                reasons = ["Respiratory symptoms detected"]
+                actions = ["Maintain comfortable sitting posture", "Use prescribed inhalers if applicable"]
+            
+            # Gastroenterology rules
+            elif any(k in symptom_lower for k in ["stomach", "vomit", "diarrhea", "nausea", "gastro", "abdomen", "digestive"]):
+                specialty = "Gastroenterology"
+                urgency_level = "moderate"
+                urgency_score = 0.8
+                reasons = ["Gastrointestinal symptoms detected"]
+                actions = ["Stay hydrated", "Consume light bland foods"]
+
+            # Dermatology rules
+            elif any(k in symptom_lower for k in ["skin", "rash", "itch", "dermatology", "eczema", "burn"]):
+                specialty = "Dermatology"
+                urgency_level = "mild"
+                urgency_score = 0.85
+                reasons = ["Dermatological signs observed"]
+                actions = ["Keep the area clean", "Avoid scratching"]
+
+            # Ophthalmology rules
+            elif any(k in symptom_lower for k in ["eye", "vision", "blind", "cornea", "redness in eye"]):
+                specialty = "Ophthalmology"
+                urgency_level = "moderate"
+                urgency_score = 0.85
+                reasons = ["Ocular symptoms reported"]
+                actions = ["Rest your eyes", "Avoid rubbing your eyes"]
+
             return {
-                "urgency_level": "moderate",
-                "urgency_score": 0.5,
-                "urgency_justification": "Unable to process symptoms. Please consult a doctor.",
-                "primary_specialty": "General Medicine",
-                "primary_confidence": 0.3,
-                "primary_reasons": ["Default recommendation"],
+                "urgency_level": urgency_level,
+                "urgency_score": urgency_score,
+                "urgency_justification": f"Fallback rule-based triage: {reasons[0]}",
+                "primary_specialty": specialty,
+                "primary_confidence": urgency_score,
+                "primary_reasons": reasons,
                 "alternative_specialties": [],
                 "key_symptoms": [symptom_description[:100]],
-                "recommended_actions": ["Consult with a general physician"],
-                "critical_warnings": [f"AI analysis failed: {str(e)}"]
+                "recommended_actions": actions,
+                "critical_warnings": warnings
             }
+
