@@ -118,7 +118,7 @@ Patient location: {state.get("location") or "Not provided"}
         try:
             response = await asyncio.to_thread(
                 self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
+                model="gemini-3.5-flash",
                 contents=prompt,
             )
             return {"report": response.text}
