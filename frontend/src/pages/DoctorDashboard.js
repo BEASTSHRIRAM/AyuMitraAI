@@ -17,6 +17,7 @@ const CompletionModal = ({ request, onClose, onComplete }) => {
   const [additionalCharges, setAdditionalCharges] = useState([]);
   const [notes, setNotes] = useState('');
   const [customItem, setCustomItem] = useState({ name: '', price: '' });
+  const [medications, setMedications] = useState([{ name: '', dosage: '', frequency: '', duration: '' }]);
 
   const predefinedItems = [
     { name: 'Syringe', price: 20, icon: Syringe },
@@ -80,7 +81,8 @@ const CompletionModal = ({ request, onClose, onComplete }) => {
       })),
       platform_fee: platformFee,
       total: grandTotal,
-      notes: notes
+      notes: notes,
+      medications: medications.filter(m => m.name.trim() !== '')
     };
     onComplete(request.request_id, billBreakdown);
   };
@@ -192,11 +194,84 @@ const CompletionModal = ({ request, onClose, onComplete }) => {
             </div>
           )}
 
+          {/* Prescription Medications */}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-sm font-bold">Prescribe Medications</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMedications([...medications, { name: '', dosage: '', frequency: '', duration: '' }])}
+                className="h-8 text-xs px-2"
+              >
+                + Add Medication
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {medications.map((med, idx) => (
+                <div key={idx} className="grid grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg items-center">
+                  <Input
+                    placeholder="Name (e.g. Paracetamol)"
+                    value={med.name}
+                    onChange={(e) => {
+                      const copy = [...medications];
+                      copy[idx].name = e.target.value;
+                      setMedications(copy);
+                    }}
+                    className="h-9 text-xs"
+                  />
+                  <Input
+                    placeholder="Dosage (e.g. 500mg)"
+                    value={med.dosage}
+                    onChange={(e) => {
+                      const copy = [...medications];
+                      copy[idx].dosage = e.target.value;
+                      setMedications(copy);
+                    }}
+                    className="h-9 text-xs"
+                  />
+                  <Input
+                    placeholder="Frequency (e.g. 1-0-1)"
+                    value={med.frequency}
+                    onChange={(e) => {
+                      const copy = [...medications];
+                      copy[idx].frequency = e.target.value;
+                      setMedications(copy);
+                    }}
+                    className="h-9 text-xs"
+                  />
+                  <div className="flex gap-1 items-center">
+                    <Input
+                      placeholder="Duration (e.g. 5 days)"
+                      value={med.duration}
+                      onChange={(e) => {
+                        const copy = [...medications];
+                        copy[idx].duration = e.target.value;
+                        setMedications(copy);
+                      }}
+                      className="h-9 text-xs flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMedications(medications.filter((_, i) => i !== idx))}
+                      className="h-9 px-1.5 text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Notes */}
           <div>
-            <Label className="text-sm">Notes (Optional)</Label>
+            <Label className="text-sm">Doctor's Instructions & Notes (Optional)</Label>
             <Input
-              placeholder="Additional notes..."
+              placeholder="e.g. Take medicines after meals, rest for 3 days..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="mt-1 h-10"

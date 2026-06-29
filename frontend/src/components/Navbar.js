@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { isAuthenticated, clearAuth, getUser } from '../utils/auth';
-import { Moon, Sun, User, LogOut, Activity, Menu, X } from 'lucide-react';
+import { Moon, Sun, User, LogOut, Activity, Menu, X, FileText } from 'lucide-react';
 import { Button } from './ui/button';
 
 const Navbar = () => {
@@ -50,6 +50,14 @@ const Navbar = () => {
                 {user?.role === 'hospital_admin' && (
                   <Link to="/hospital-registration" data-testid="dashboard-link">
                     <Button variant="ghost" size="sm">Hospital</Button>
+                  </Link>
+                )}
+                {user?.role === 'patient' && (
+                  <Link to="/consultations" data-testid="consultations-link">
+                    <Button variant="ghost" size="sm">
+                      <FileText className="w-4 h-4 mr-1" />
+                      Consultations
+                    </Button>
                   </Link>
                 )}
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors duration-500">

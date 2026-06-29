@@ -10,9 +10,13 @@ import { toast } from 'sonner';
 import { 
   Stethoscope, Loader2, Phone, MapPin, Clock, CheckCircle, Navigation, 
   CreditCard, X, Plus, History, ChevronRight, Calendar,
-  MessageSquarePlus, Menu, Search, Globe
+  MessageSquarePlus, Menu, Search, Globe, FileText
 } from 'lucide-react';
 import PaymentGateway from '../components/PaymentGateway';
+import AgentTracePanel from '../components/AgentTracePanel';
+import { generatePrescriptionPDF } from '../utils/prescriptionPDF';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 const PatientDashboard = () => {
   // Sidebar state
@@ -39,6 +43,13 @@ const PatientDashboard = () => {
   const [webDoctors, setWebDoctors] = useState([]);
   const [loadingWebSearch, setLoadingWebSearch] = useState(false);
   const [showWebDoctors, setShowWebDoctors] = useState(false);
+
+  // Agent trace state
+  const [showAgentTrace, setShowAgentTrace] = useState(false);
+  const [agentTraceKey, setAgentTraceKey] = useState(0); // force remount
+
+  // Prescription state
+  const [downloadingPrescription, setDownloadingPrescription] = useState(false);
 
   // Check screen size
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -125,6 +136,7 @@ const PatientDashboard = () => {
     setBillBreakdown(null);
     setWebDoctors([]);
     setShowWebDoctors(false);
+    setShowAgentTrace(false);
     if (isMobile) setSidebarOpen(false);
   };
 
@@ -138,38 +150,30 @@ const PatientDashboard = () => {
 
   const handleConnectWithDoctor = async (e) => {
     e.preventDefault();
-    setLoading(true);
-
-    try {
-      const response = await api.post('/connect-with-doctor', {
-        symptom_description: symptomDescription,
-        patient_age: patientAge ? parseInt(patientAge) : null
-      });
-      
-      const doctors = response.data.matching_doctors || [];
-      
-      if (doctors.length === 0) {
-        toast.error('No doctors available at the moment. Please try again later.');
-        setLoading(false);
-        return;
-      }
-      
-      const rid = response.data.request_id;
-      // Persist to localStorage so session survives reload & registration redirect
-      localStorage.setItem('ayumitra_request_id', rid);
-      localStorage.setItem('ayumitra_matched_doctors', JSON.stringify(doctors));
-
-      setRequestId(rid);
-      setMatchedDoctors(doctors);
-      setRequestStatus('pending');
-      toast.success(`Found ${doctors.length} matching doctors!`);
-      
-      startPolling(rid);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Connection failed');
-    } finally {
-      setLoading(false);
+    if (!symptomDescription.trim()) {
+      toast.error('Please describe your symptoms');
+      return;
     }
+    // Show the agent trace panel — it will handle the stream itself
+    setShowAgentTrace(true);
+    setAgentTraceKey(k => k + 1);
+  };
+
+  const handleAgentTraceDone = ({ request_id, matching_doctors, primary_specialty, urgency_level, urgency_score }) => {
+    const doctors = matching_doctors || [];
+    if (doctors.length === 0) {
+      toast.error('No doctors available at the moment.');
+      setShowAgentTrace(false);
+      return;
+    }
+    localStorage.setItem('ayumitra_request_id', request_id);
+    localStorage.setItem('ayumitra_matched_doctors', JSON.stringify(doctors));
+    setRequestId(request_id);
+    setMatchedDoctors(doctors);
+    setRequestStatus('pending');
+    setShowAgentTrace(false);
+    toast.success(`✅ Found ${doctors.length} matching doctor${doctors.length !== 1 ? 's' : ''}!`);
+    startPolling(request_id);
   };
 
   const startPolling = (reqId) => {
@@ -242,6 +246,35 @@ const PatientDashboard = () => {
     toast.success(`Payment successful!`);
     loadHistory();
     startNewSession();
+  };
+
+  const handleDownloadPrescription = async () => {
+    setDownloadingPrescription(true);
+    try {
+      const token = localStorage.getItem('ayumitra-token');
+      if (!token) return;
+
+      const res = await api.get(`/patient/prescription/request/${requestId}`);
+      const rx = res.data;
+
+      generatePrescriptionPDF({
+        patientName: rx.patient_name || 'Patient',
+        patientAge: patientAge || '',
+        doctorName: rx.doctor_name || 'Doctor',
+        doctorSpecialty: rx.doctor_specialty || '',
+        symptoms: rx.symptoms || '',
+        notes: rx.notes || '',
+        medications: rx.medications || [],
+        date: rx.created_at || new Date().toISOString(),
+        prescriptionId: rx.prescription_id
+      });
+
+      toast.success('Prescription PDF downloaded successfully!');
+    } catch (err) {
+      toast.error('Prescription details not found or not ready yet.');
+    } finally {
+      setDownloadingPrescription(false);
+    }
   };
 
   const handleSearchFromWeb = async () => {
@@ -327,7 +360,8 @@ const PatientDashboard = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)] relative">
+    <>
+      <div className="flex h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)] relative">
       {/* Payment Gateway Modal */}
       {showPaymentGateway && (
         <PaymentGateway
@@ -514,7 +548,7 @@ const PatientDashboard = () => {
             )}
 
             {/* New Consultation Form */}
-            {!selectedHistory && !matchedDoctors && (
+            {!selectedHistory && !matchedDoctors && !showAgentTrace && (
               <Card>
                 <CardHeader className="pb-3 sm:pb-6">
                   <CardTitle className="text-lg sm:text-xl">What's bothering you?</CardTitle>
@@ -559,21 +593,41 @@ const PatientDashboard = () => {
 
                     <Button
                       type="submit"
-                      disabled={loading || symptomDescription.trim().length < 10}
+                      disabled={symptomDescription.trim().length < 10}
                       className="w-full rounded-full py-5 sm:py-6 text-base sm:text-lg font-semibold"
                     >
-                      {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Finding doctors...
-                        </>
-                      ) : (
-                        'Connect with Doctor'
-                      )}
+                      Connect with Doctor (AI Triage)
                     </Button>
                   </form>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Agent Trace Panel */}
+            {showAgentTrace && (
+              <div className="space-y-4">
+                <AgentTracePanel
+                  key={agentTraceKey}
+                  symptoms={symptomDescription}
+                  patientAge={patientAge}
+                  patientName={null}
+                  backendUrl={BACKEND_URL}
+                  onComplete={handleAgentTraceDone}
+                  onError={(msg) => {
+                    toast.error('Agent pipeline failed: ' + msg);
+                    setShowAgentTrace(false);
+                  }}
+                />
+                <button
+                  onClick={() => setShowAgentTrace(false)}
+                  style={{
+                    background: 'none', border: '1px solid #334155', color: '#94a3b8',
+                    borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', width: '100%'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             )}
 
             {/* Active Session */}
@@ -610,6 +664,43 @@ const PatientDashboard = () => {
                   <Card className="border-2 border-teal-500 bg-teal-50 dark:bg-teal-950/30">
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-teal-700 dark:text-teal-300 text-lg">
+                        <CreditCard className="w-5 h-5" />
+                        Consultation Complete
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {/* ... existing payment content ... */}
+                      {localStorage.getItem('ayumitra-token') && (
+                        <div className="mt-4 pt-4 border-t border-teal-200 dark:border-teal-800">
+                          <Button
+                            id="generate-prescription-btn"
+                            onClick={handleDownloadPrescription}
+                            disabled={downloadingPrescription}
+                            className="w-full rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                          >
+                            {downloadingPrescription ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Downloading...
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Download Prescription PDF
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Original Payment Required Card */}
+                {showPayment && assignedDoctor && (
+                  <Card className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-950/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300 text-lg">
                         <CreditCard className="w-5 h-5" />
                         Payment Required
                       </CardTitle>
@@ -848,6 +939,8 @@ const PatientDashboard = () => {
         </div>
       </div>
     </div>
+
+    </>
   );
 };
 

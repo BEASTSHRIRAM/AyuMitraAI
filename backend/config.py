@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     LANGCHAIN_TRACING_V2: str = "true"
     LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
     FIRECRAWL_API_KEY: str = ""
+    QDRANT_URL: str = ""
+    QDRANT_API_KEY: str = ""
     
     class Config:
         env_file = str(BACKEND_DIR / ".env")

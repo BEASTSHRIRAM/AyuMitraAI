@@ -13,6 +13,7 @@ import os
 import sys
 import uuid
 import time
+import asyncio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,6 +27,7 @@ from models import *
 from auth import hash_password, verify_password, create_access_token, get_current_user
 from gemini_service import GeminiSymptomAnalyzer
 from triage_graph import HealthCopilotGraph
+from qdrant_service import store_prescription, search_similar_prescriptions
 
 settings = get_settings()
 
@@ -948,7 +950,6 @@ async def reject_patient_request(request_id: str, current_user: dict = Depends(g
     return {"message": "Request rejected successfully"}
 
 @api_router.post("/doctor/request/{request_id}/complete")
-
 async def complete_patient_request(request_id: str, body: dict = None, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can complete requests")
@@ -970,13 +971,49 @@ async def complete_patient_request(request_id: str, body: dict = None, current_u
         {"$set": update_data}
     )
     
-    if result.modified_count == 0:
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Request not found")
     
     await db.doctors.update_one(
         {"doctor_id": current_user["sub"]},
         {"$inc": {"patients_treated": 1}}
     )
+
+    # Automatically generate prescription from doctor inputs
+    if bill_breakdown:
+        doctor_doc = await db.doctors.find_one({"doctor_id": current_user["sub"]})
+        doctor_name = doctor_doc.get("full_name", "Doctor") if doctor_doc else "Doctor"
+        doctor_specialty = doctor_doc.get("specialization", "") if doctor_doc else ""
+
+        prescription_id = str(uuid.uuid4())
+        medications = bill_breakdown.get("medications", [])
+        notes = bill_breakdown.get("notes", "")
+
+        prescription_doc = {
+            "prescription_id": prescription_id,
+            "patient_id": request_doc.get("patient_id"),
+            "patient_name": request_doc.get("patient_name", "Patient"),
+            "doctor_name": doctor_name,
+            "doctor_specialty": doctor_specialty,
+            "request_id": request_id,
+            "symptoms": request_doc.get("symptoms", ""),
+            "notes": notes,
+            "medications": medications,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.prescriptions.insert_one(prescription_doc)
+
+        # Store in Qdrant Vector Store
+        await store_prescription(
+            prescription_id=prescription_id,
+            patient_id=request_doc.get("patient_id"),
+            patient_name=request_doc.get("patient_name", "Patient"),
+            doctor_name=doctor_name,
+            specialty=doctor_specialty,
+            symptoms=request_doc.get("symptoms", ""),
+            notes=notes,
+            medications=medications
+        )
     
     return {"message": "Request completed", "bill_breakdown": bill_breakdown}
 
@@ -1235,7 +1272,222 @@ async def connect_with_web_doctor(request: dict):
         "next_step": "Doctor will contact you shortly"
     }
 
+
+
+# ---------------------------------------------------------------------------
+# Streaming agent trace endpoint
+# ---------------------------------------------------------------------------
+
+@app.post("/api/connect-with-doctor/stream")
+async def connect_with_doctor_stream(request_data: SymptomAnalysisRequest):
+    """
+    SSE streaming endpoint that narrates agent reasoning in real time.
+    Each server-sent event represents one step of the multi-agent pipeline.
+    """
+    async def agent_event_stream():
+        symptoms = request_data.symptom_description
+        patient_age = request_data.patient_age
+        request_id = str(uuid.uuid4())
+
+        def sse(obj: dict) -> str:
+            return "data: " + json.dumps(obj, default=str) + "\n\n"
+
+        # Step 1 — Triage Agent start
+        yield sse({"event": "agent_start", "agent": "TriageAgent", "step": 1,
+                   "thinking": f"Received patient symptoms: '{symptoms[:80]}...'. Starting clinical triage analysis."})
+        await asyncio.sleep(0.4)
+
+        # Step 2 — Tool call: find_matching_specialties
+        yield sse({"event": "tool_call", "tool": "find_matching_specialties",
+                   "step": 2, "input": symptoms})
+        await asyncio.sleep(0.3)
+
+        from langchain_agents import find_matching_specialties
+        specialty_result = await asyncio.to_thread(find_matching_specialties.invoke, {"symptoms": symptoms})
+        top_specialty = (specialty_result.get("specialties") or [{"specialty": "General Medicine"}])[0]["specialty"]
+
+        yield sse({"event": "tool_result", "tool": "find_matching_specialties",
+                   "step": 2, "output": specialty_result})
+        await asyncio.sleep(0.4)
+
+        # Step 3 — Gemini Symptom Analyzer (calls Gemini LLM)
+        yield sse({"event": "agent_start", "agent": "SymptomAnalyzerAgent", "step": 3,
+                   "thinking": f"Top specialty candidate: {top_specialty}. Calling Gemini LLM for deep clinical reasoning."})
+        await asyncio.sleep(0.3)
+
+        analysis = await gemini_analyzer.analyze_symptoms(symptoms, patient_age)
+        detected_specialty = analysis.get("primary_specialty", top_specialty)
+        urgency = analysis.get("urgency_level", "moderate")
+        urgency_score = analysis.get("urgency_score", 0.5)
+
+        yield sse({"event": "llm_response", "agent": "SymptomAnalyzerAgent", "step": 3,
+                   "specialty": detected_specialty, "urgency": urgency,
+                   "urgency_score": urgency_score,
+                   "justification": analysis.get("urgency_justification", "")})
+        await asyncio.sleep(0.4)
+
+        # Step 4 — RoutingAgent
+        yield sse({"event": "agent_start", "agent": "RoutingAgent", "step": 4,
+                   "thinking": f"Urgency: {urgency} ({urgency_score:.0%}). Now querying DB for online {detected_specialty} doctors."})
+        await asyncio.sleep(0.3)
+
+        # Step 5 — Tool call: check_doctor_availability
+        yield sse({"event": "tool_call", "tool": "check_doctor_availability",
+                   "step": 5, "input": {"specialty": detected_specialty, "urgency": urgency}})
+        await asyncio.sleep(0.3)
+
+        from langchain_agents import check_doctor_availability
+        avail_result = await asyncio.to_thread(
+            check_doctor_availability.invoke,
+            {"specialty": detected_specialty, "urgency": urgency}
+        )
+        yield sse({"event": "tool_result", "tool": "check_doctor_availability",
+                   "step": 5, "output": avail_result})
+        await asyncio.sleep(0.3)
+
+        # Step 6 — DB doctor fetch (the original path)
+        matching_doctors = await find_matching_doctors(detected_specialty, urgency)
+        yield sse({"event": "agent_start", "agent": "MatchingAgent", "step": 6,
+                   "thinking": f"Found {len(matching_doctors)} verified online doctor(s) in DB. Sending consultation requests."})
+        await asyncio.sleep(0.3)
+
+        # Persist the request
+        temp_patient_id = f"temp_{uuid.uuid4()}"
+        patient_request_doc = {
+            "request_id": request_id,
+            "patient_id": temp_patient_id,
+            "patient_name": request_data.patient_name or "Anonymous Patient",
+            "patient_age": patient_age,
+            "symptoms": symptoms,
+            "urgency_level": urgency,
+            "urgency_score": urgency_score,
+            "primary_specialty": detected_specialty,
+            "requested_at": datetime.now(timezone.utc).isoformat(),
+            "status": "pending",
+            "matched_doctors": [doc["doctor_id"] for doc in matching_doctors],
+            "assigned_doctor_id": None
+        }
+        await db.patient_requests.insert_one(patient_request_doc)
+
+        for doctor in matching_doctors:
+            await db.doctor_notifications.insert_one({
+                "notification_id": str(uuid.uuid4()),
+                "doctor_id": doctor["doctor_id"],
+                "patient_request_id": request_id,
+                "patient_name": request_data.patient_name or "Anonymous Patient",
+                "symptoms": symptoms,
+                "urgency_level": urgency,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "read": False
+            })
+
+        # Final done event
+        yield sse({
+            "event": "done",
+            "step": 7,
+            "request_id": request_id,
+            "primary_specialty": detected_specialty,
+            "urgency_level": urgency,
+            "urgency_score": urgency_score,
+            "matching_doctors": [
+                {
+                    "doctor_id": doc["doctor_id"],
+                    "name": doc["full_name"],
+                    "specialization": doc["specialization"],
+                    "experience_years": doc["experience_years"],
+                    "facility_name": doc.get("facility_name"),
+                    "is_online": doc.get("availability", {}).get("is_online", False)
+                }
+                for doc in matching_doctors
+            ]
+        })
+
+    import asyncio as _asyncio
+    return StreamingResponse(
+        agent_event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Prescription endpoints
+# ---------------------------------------------------------------------------
+
+@api_router.post("/patient/prescription")
+async def create_prescription(
+    payload: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Save a prescription after consultation.
+    Embeds it into Qdrant for future RAG context.
+    """
+    prescription_id = str(uuid.uuid4())
+    patient_id = current_user["sub"]
+
+    doc = {
+        "prescription_id": prescription_id,
+        "patient_id": patient_id,
+        "patient_name": payload.get("patient_name", ""),
+        "doctor_name": payload.get("doctor_name", ""),
+        "doctor_specialty": payload.get("doctor_specialty", ""),
+        "request_id": payload.get("request_id", ""),
+        "symptoms": payload.get("symptoms", ""),
+        "notes": payload.get("notes", ""),
+        "medications": payload.get("medications", []),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.prescriptions.insert_one(doc)
+
+    # Store embedding in Qdrant for RAG
+    await store_prescription(
+        prescription_id=prescription_id,
+        patient_id=patient_id,
+        patient_name=payload.get("patient_name", ""),
+        doctor_name=payload.get("doctor_name", ""),
+        specialty=payload.get("doctor_specialty", ""),
+        symptoms=payload.get("symptoms", ""),
+        notes=payload.get("notes", ""),
+        medications=payload.get("medications", []),
+    )
+
+    doc.pop("_id", None)
+    return {"prescription_id": prescription_id, "status": "saved"}
+
+
+@api_router.get("/patient/prescriptions")
+async def get_prescriptions(current_user: dict = Depends(get_current_user)):
+    """Get all prescriptions for the current patient."""
+    patient_id = current_user["sub"]
+    prescriptions = await db.prescriptions.find(
+        {"patient_id": patient_id}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return {"prescriptions": prescriptions}
+
+
+@api_router.get("/patient/prescription/request/{request_id}")
+async def get_prescription_by_request(request_id: str, current_user: dict = Depends(get_current_user)):
+    """Retrieve pre-filled prescription matching the given request_id."""
+    rx = await db.prescriptions.find_one({"request_id": request_id}, {"_id": 0})
+    if not rx:
+        raise HTTPException(status_code=404, detail="Prescription not found")
+    return rx
+
+
+@api_router.get("/patient/similar-prescriptions")
+async def get_similar_prescriptions(
+    query: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Retrieve semantically similar past prescriptions via Qdrant for RAG context."""
+    patient_id = current_user["sub"]
+    results = await search_similar_prescriptions(query, patient_id=patient_id, top_k=3)
+    return {"similar_prescriptions": results}
+
+
 app.include_router(api_router)
+
 
 @app.on_event("shutdown")
 async def shutdown():

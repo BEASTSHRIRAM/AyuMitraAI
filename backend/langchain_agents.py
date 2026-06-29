@@ -5,6 +5,7 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage
+from motor.motor_asyncio import AsyncIOMotorClient
 import json
 import os
 import sys
@@ -25,6 +26,25 @@ os.environ["LANGSMITH_PROJECT"] = settings.LANGSMITH_PROJECT
 google_api_key = settings.GOOGLE_API_KEY or settings.GOOGLE_GEMINI_API_KEY
 os.environ["GOOGLE_API_KEY"] = google_api_key
 
+# Shared MongoDB client for tools
+_motor_client = AsyncIOMotorClient(settings.MONGO_URL)
+_db = _motor_client[settings.DB_NAME]
+
+
+def _run_async(coro):
+    """Bridge async DB calls into sync LangChain tools."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, coro)
+                return future.result(timeout=10)
+        else:
+            return loop.run_until_complete(coro)
+    except Exception as e:
+        return None
+
 @tool
 def analyze_symptom_severity(symptoms: str, patient_age: int = None) -> dict:
     """
@@ -38,26 +58,86 @@ def analyze_symptom_severity(symptoms: str, patient_age: int = None) -> dict:
     }
 
 @tool
-def find_matching_specialties(symptoms: str) -> list:
+def find_matching_specialties(symptoms: str) -> dict:
     """
-    Find medical specialties that match the patient's symptoms.
-    Returns list of recommended specialties with confidence scores.
+    Find medical specialties that match the patient's symptoms using keyword analysis.
+    Returns list of recommended specialties with confidence scores based on symptom keywords.
     """
+    symptom_lower = symptoms.lower()
+    specialty_scores = []
+    
+    keyword_map = {
+        "Cardiology": ["heart", "chest pain", "cardiac", "palpitation", "angina"],
+        "Neurology": ["seizure", "stroke", "migraine", "headache", "numbness", "paralysis", "brain"],
+        "Orthopedics": ["bone", "joint", "fracture", "back pain", "knee", "shoulder", "sprain"],
+        "Pulmonology": ["breath", "cough", "asthma", "lung", "wheezing", "shortness of breath"],
+        "Gastroenterology": ["stomach", "vomit", "diarrhea", "nausea", "abdomen", "digestive"],
+        "Dermatology": ["skin", "rash", "itch", "eczema", "burn"],
+        "Ophthalmology": ["eye", "vision", "blind", "cornea"],
+        "General Medicine": ["fever", "cold", "flu", "fatigue", "weakness", "pain"],
+        "Emergency Medicine": ["severe", "emergency", "critical", "unconscious", "bleeding"],
+    }
+    
+    for specialty, keywords in keyword_map.items():
+        hits = sum(1 for kw in keywords if kw in symptom_lower)
+        if hits > 0:
+            specialty_scores.append({"specialty": specialty, "confidence": round(min(hits / 3, 1.0), 2), "matched_keywords": [kw for kw in keywords if kw in symptom_lower]})
+    
+    specialty_scores.sort(key=lambda x: x["confidence"], reverse=True)
+    
     return {
         "symptoms": symptoms,
-        "specialties": ["Neurosurgery", "Neurology", "General Medicine"]
+        "specialties": specialty_scores[:3] if specialty_scores else [{"specialty": "General Medicine", "confidence": 0.5, "matched_keywords": []}]
     }
 
 @tool
 def check_doctor_availability(specialty: str, urgency: str) -> dict:
     """
-    Check which doctors are available for the given specialty and urgency level.
-    Returns list of available doctors with their details.
+    Check which doctors are currently ONLINE in the database for the given specialty.
+    Queries MongoDB doctors collection in real time. Returns available doctors with details.
     """
+    async def _query():
+        specialty_lower = specialty.lower()
+        keyword_map = {
+            "cardiology": ["cardiology", "cardiologist", "heart", "cardiac"],
+            "neurology": ["neurology", "neurologist", "neuro"],
+            "orthopedics": ["orthopedics", "orthopaedics", "orthopedic", "bone", "joint"],
+            "gastroenterology": ["gastroenterology", "gastro", "digestive"],
+            "pulmonology": ["pulmonology", "lung", "respiratory"],
+            "dermatology": ["dermatology", "skin"],
+            "ophthalmology": ["ophthalmology", "eye"],
+            "general medicine": ["general", "medicine", "physician", "gp", "family"],
+            "emergency medicine": ["emergency", "trauma", "critical"],
+        }
+        keywords = set()
+        for spec, kws in keyword_map.items():
+            if spec in specialty_lower or specialty_lower in spec:
+                keywords.update(kws)
+        if not keywords:
+            keywords.add(specialty_lower)
+        
+        all_doctors = await _db.doctors.find({}, {"_id": 0}).to_list(100)
+        matched = []
+        for doc in all_doctors:
+            if not doc.get("availability", {}).get("is_online", False):
+                continue
+            doc_spec = doc.get("specialization", "").lower()
+            if any(kw in doc_spec or doc_spec in kw for kw in keywords):
+                matched.append({
+                    "name": doc.get("full_name"),
+                    "specialization": doc.get("specialization"),
+                    "experience_years": doc.get("experience_years"),
+                    "facility": doc.get("facility_name"),
+                    "is_online": True
+                })
+        return matched
+    
+    doctors = _run_async(_query()) or []
     return {
         "specialty": specialty,
         "urgency": urgency,
-        "available_doctors": []
+        "available_doctors": doctors,
+        "count": len(doctors)
     }
 
 @tool
@@ -165,7 +245,7 @@ Please analyze this patient and provide:
             # Make a traced Gemini call with async wrapper
             response = await asyncio.to_thread(
                 self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
+                model="gemini-3.5-flash",
                 contents=full_prompt,
             )
             

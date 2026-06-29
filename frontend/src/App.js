@@ -13,6 +13,7 @@ import DoctorDashboard from './pages/DoctorDashboard';
 import ResultsPage from './pages/ResultsPage';
 import ClinicRegistration from './pages/ClinicRegistration';
 import HospitalRegistration from './pages/HospitalRegistration';
+import Consultations from './pages/Consultations';
 import './App.css';
 
 const PrivateRoute = ({ children, allowedRoles }) => {
@@ -73,6 +74,14 @@ function App() {
               element={
                 <PrivateRoute allowedRoles={['hospital_admin']}>
                   <HospitalRegistration />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/consultations"
+              element={
+                <PrivateRoute allowedRoles={['patient']}>
+                  <Consultations />
                 </PrivateRoute>
               }
             />
