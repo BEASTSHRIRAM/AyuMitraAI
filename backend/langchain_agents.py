@@ -13,6 +13,7 @@ import asyncio
 
 sys.path.append(os.path.dirname(__file__))
 from config import get_settings
+from model_utils import generate_with_fallback
 
 settings = get_settings()
 
@@ -67,15 +68,30 @@ def find_matching_specialties(symptoms: str) -> dict:
     specialty_scores = []
     
     keyword_map = {
-        "Cardiology": ["heart", "chest pain", "cardiac", "palpitation", "angina"],
-        "Neurology": ["seizure", "stroke", "migraine", "headache", "numbness", "paralysis", "brain"],
-        "Orthopedics": ["bone", "joint", "fracture", "back pain", "knee", "shoulder", "sprain"],
-        "Pulmonology": ["breath", "cough", "asthma", "lung", "wheezing", "shortness of breath"],
-        "Gastroenterology": ["stomach", "vomit", "diarrhea", "nausea", "abdomen", "digestive"],
-        "Dermatology": ["skin", "rash", "itch", "eczema", "burn"],
-        "Ophthalmology": ["eye", "vision", "blind", "cornea"],
-        "General Medicine": ["fever", "cold", "flu", "fatigue", "weakness", "pain"],
-        "Emergency Medicine": ["severe", "emergency", "critical", "unconscious", "bleeding"],
+        "Cardiology":                        ["heart", "chest pain", "cardiac", "palpitation", "angina"],
+        "Neurology":                         ["seizure", "stroke", "migraine", "headache", "numbness", "paralysis", "brain"],
+        "Neurosurgery":                      ["brain surgery", "neurosurgery", "tumor", "aneurysm", "spine surgery"],
+        "Orthopedic Surgery":                ["bone", "joint", "fracture", "back pain", "knee", "shoulder", "sprain", "sports injury"],
+        "Pulmonology":                       ["breath", "cough", "asthma", "lung", "wheezing", "shortness of breath"],
+        "Gastroenterology":                  ["stomach", "vomit", "diarrhea", "nausea", "abdomen", "digestive", "liver"],
+        "Dermatology":                       ["skin", "rash", "itch", "eczema", "burn", "acne"],
+        "Ophthalmology":                     ["eye", "vision", "blind", "cornea", "cataract"],
+        "Gynecology":                        ["pregnant", "pregnancy", "menstrual", "period", "uterus", "ovary", "pcos", "vaginal", "cervical", "gynaecology", "gynecology", "female reproductive"],
+        "Obstetrics":                        ["labour", "labor", "prenatal", "antenatal", "delivery", "childbirth", "obstetrics"],
+        "Pediatrics":                        ["child", "infant", "baby", "toddler", "newborn", "pediatric", "kid"],
+        "Psychiatry":                        ["depression", "anxiety", "mental", "suicidal", "panic", "hallucination", "bipolar", "ocd", "ptsd"],
+        "Urology":                           ["urine", "urinary", "kidney stone", "bladder", "prostate", "uti", "urethra"],
+        "Endocrinology":                     ["diabetes", "thyroid", "hormonal", "insulin", "blood sugar", "hypoglycemia"],
+        "Otolaryngology (ENT)":              ["ear", "hearing", "nose", "sinus", "throat", "tonsil", "nasal", "snoring", "ent"],
+        "Oncology":                          ["cancer", "tumor", "lump", "biopsy", "malignant", "chemotherapy"],
+        "Rheumatology":                      ["arthritis", "lupus", "autoimmune", "rheumatoid", "gout"],
+        "Nephrology":                        ["kidney", "renal", "dialysis", "creatinine", "nephritis"],
+        "Hematology":                        ["blood disorder", "anemia", "clotting", "platelet", "hemoglobin", "leukemia"],
+        "Infectious Disease":                ["infection", "fever", "malaria", "typhoid", "dengue", "tuberculosis", "tb"],
+        "Allergy and Immunology":            ["allergy", "allergic", "hives", "anaphylaxis", "food allergy"],
+        "Geriatrics":                        ["elderly", "old age", "senior", "aging", "dementia", "geriatric"],
+        "Emergency Medicine":                ["severe", "emergency", "critical", "unconscious", "bleeding"],
+        "General Medicine":                  ["fever", "cold", "flu", "fatigue", "weakness", "pain"],
     }
     
     for specialty, keywords in keyword_map.items():
@@ -99,15 +115,37 @@ def check_doctor_availability(specialty: str, urgency: str) -> dict:
     async def _query():
         specialty_lower = specialty.lower()
         keyword_map = {
-            "cardiology": ["cardiology", "cardiologist", "heart", "cardiac"],
-            "neurology": ["neurology", "neurologist", "neuro"],
-            "orthopedics": ["orthopedics", "orthopaedics", "orthopedic", "bone", "joint"],
-            "gastroenterology": ["gastroenterology", "gastro", "digestive"],
-            "pulmonology": ["pulmonology", "lung", "respiratory"],
-            "dermatology": ["dermatology", "skin"],
-            "ophthalmology": ["ophthalmology", "eye"],
-            "general medicine": ["general", "medicine", "physician", "gp", "family"],
-            "emergency medicine": ["emergency", "trauma", "critical"],
+            "cardiology":                       ["cardiology", "cardiologist", "heart", "cardiac"],
+            "neurology":                        ["neurology", "neurologist", "neuro"],
+            "neurosurgery":                     ["neurosurgery", "neurosurgeon", "brain surgery"],
+            "orthopedic surgery":               ["orthopedic", "orthopaedic", "bone", "joint", "fracture", "sports"],
+            "gastroenterology":                 ["gastroenterology", "gastro", "digestive", "gastroenterologist"],
+            "pulmonology":                      ["pulmonology", "lung", "respiratory", "pulmonologist"],
+            "dermatology":                      ["dermatology", "skin", "dermatologist"],
+            "ophthalmology":                    ["ophthalmology", "eye", "ophthalmologist"],
+            "gynecology":                       ["gynecology", "gynaecology", "gynecologist", "gynaecologist", "obstetrics", "obstetrician", "womens health", "women"],
+            "obstetrics":                       ["obstetrics", "obstetrician", "prenatal", "antenatal", "pregnancy", "maternity"],
+            "pediatrics":                       ["pediatrics", "paediatrics", "pediatrician", "paediatrician", "child", "infant"],
+            "psychiatry":                       ["psychiatry", "psychiatrist", "mental health", "psychology"],
+            "urology":                          ["urology", "urologist", "urinary", "bladder", "prostate"],
+            "endocrinology":                    ["endocrinology", "endocrinologist", "diabetes", "thyroid", "hormonal"],
+            "otolaryngology (ent)":             ["ent", "otolaryngology", "ear", "nose", "throat", "sinus"],
+            "oncology":                         ["oncology", "oncologist", "cancer", "tumor"],
+            "rheumatology":                     ["rheumatology", "rheumatologist", "arthritis", "autoimmune"],
+            "nephrology":                       ["nephrology", "nephrologist", "kidney", "renal", "dialysis"],
+            "hematology":                       ["hematology", "haematology", "blood", "anemia"],
+            "infectious disease":               ["infectious", "infection", "fever", "tropical"],
+            "allergy and immunology":           ["allergy", "allergist", "immunology", "immunologist"],
+            "geriatrics":                       ["geriatrics", "geriatrician", "elderly", "senior"],
+            "internal medicine":                ["internal medicine", "internist"],
+            "family medicine":                  ["family medicine", "family doctor", "family physician"],
+            "general surgery":                  ["general surgery", "surgeon", "surgical"],
+            "thoracic surgery":                 ["thoracic", "chest surgery"],
+            "vascular surgery":                 ["vascular", "blood vessel"],
+            "plastic surgery":                  ["plastic surgery", "cosmetic", "reconstructive"],
+            "physical medicine and rehabilitation": ["rehabilitation", "physio", "physiotherapy", "rehab"],
+            "general medicine":                 ["general", "medicine", "physician", "gp", "family", "general practitioner"],
+            "emergency medicine":               ["emergency", "trauma", "critical", "er"],
         }
         keywords = set()
         for spec, kws in keyword_map.items():
@@ -242,16 +280,11 @@ Please analyze this patient and provide:
         full_prompt = f"{system_prompt}\n\n{input_message}"
         
         try:
-            # Make a traced Gemini call with async wrapper
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-3.5-flash",
-                contents=full_prompt,
-            )
-            
+            # Model fallback chain: 2.5-flash -> 2.0-flash -> 2.0-flash-lite -> 1.5-flash
+            routing_text = await generate_with_fallback(self.client, full_prompt)
             return {
                 "status": "success",
-                "routing_decision": response.text,
+                "routing_decision": routing_text,
                 "reasoning": "Agent analysis complete"
             }
         except Exception as e:
@@ -317,14 +350,10 @@ Perform triage assessment and provide:
         full_prompt = f"{system_prompt}\n\n{input_message}"
         
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
-                contents=full_prompt,
-            )
+            triage_text = await generate_with_fallback(self.client, full_prompt)
             return {
                 "status": "success",
-                "triage_assessment": response.text
+                "triage_assessment": triage_text
             }
         except Exception as e:
             return {
@@ -378,14 +407,10 @@ Provide:
 IMPORTANT: This is for informational purposes only. Always consult with a pharmacist or doctor."""
 
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
-                contents=prompt,
-            )
+            analysis_text = await generate_with_fallback(self.client, prompt)
             return {
                 "status": "success",
-                "analysis": response.text
+                "analysis": analysis_text
             }
         except Exception as e:
             return {
@@ -435,14 +460,10 @@ Provide:
 8. When to seek emergency care"""
 
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
-                contents=prompt,
-            )
+            plan_text = await generate_with_fallback(self.client, prompt)
             return {
                 "status": "success",
-                "followup_plan": response.text
+                "followup_plan": plan_text
             }
         except Exception as e:
             return {
@@ -498,14 +519,10 @@ Reference Ranges:
 - Respiratory Rate: 12-20 breaths/min (normal)"""
 
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
-                contents=prompt,
-            )
+            analysis_text = await generate_with_fallback(self.client, prompt)
             return {
                 "status": "success",
-                "vitals_analysis": response.text
+                "vitals_analysis": analysis_text
             }
         except Exception as e:
             return {
@@ -553,14 +570,10 @@ Provide:
 6. Tips for remembering to take medications"""
 
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-2.0-flash-exp",
-                contents=prompt,
-            )
+            schedule_text = await generate_with_fallback(self.client, prompt)
             return {
                 "status": "success",
-                "medication_schedule": response.text
+                "medication_schedule": schedule_text
             }
         except Exception as e:
             return {

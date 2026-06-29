@@ -168,9 +168,9 @@ class DoctorProfile(BaseModel):
     email: str
     specialization: str
     experience_years: int
-    license_number: str
+    license_number: Optional[str] = None
     phone: str
-    facility_id: str
+    facility_id: Optional[str] = None
     facility_name: Optional[str] = None
     facility_type: Optional[str] = None
     availability: DoctorAvailability

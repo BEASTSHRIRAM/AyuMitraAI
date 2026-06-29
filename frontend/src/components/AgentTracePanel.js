@@ -115,6 +115,8 @@ const AgentTracePanel = ({ symptoms, patientAge, patientName, onComplete, onErro
             primary_specialty: event.primary_specialty,
             urgency_level: event.urgency_level,
             urgency_score: event.urgency_score,
+            recommended_actions: event.recommended_actions,
+            critical_warnings: event.critical_warnings,
           });
         }, 1200);
         break;

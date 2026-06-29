@@ -9,6 +9,7 @@ import asyncio
 
 sys.path.append(os.path.dirname(__file__))
 from config import get_settings
+from model_utils import generate_with_fallback
 
 settings = get_settings()
 
@@ -59,18 +60,43 @@ class GeminiSymptomAnalyzer:
 - Suspected heart attack symptoms
 
 **MEDICAL SPECIALTIES (Return EXACTLY one of these):**
-- Neurosurgery (for brain surgery, tumors, aneurysms)
-- Neurology (for neurological conditions, seizures)
-- Cardiology (for heart conditions)
-- Orthopedics (for bone/joint issues)
-- Gastroenterology (for digestive issues)
-- Pulmonology (for lung/respiratory issues)
-- Dermatology (for skin issues)
-- Ophthalmology (for eye issues)
-- General Medicine (for general conditions)
-- Emergency Medicine (for critical cases)
+- Allergy and Immunology (for allergies, immune reactions, anaphylaxis)
+- Anesthesiology (for surgery prep, pain management)
+- Cardiology (for heart, chest pain, cardiac conditions)
+- Dermatology (for skin rashes, acne, eczema)
+- Emergency Medicine (for critical, life-threatening cases)
+- Endocrinology (for diabetes, thyroid, hormonal issues)
+- Family Medicine (for general care, all ages)
+- Gastroenterology (for stomach, digestive, liver)
+- Geriatrics (for elderly patients, age-related conditions)
+- Gynecology (for female reproductive issues, menstruation, PCOS)
+- Hematology (for blood disorders, anemia, clotting)
+- Infectious Disease (for infections, fever, tropical diseases)
+- Internal Medicine (for complex adult conditions)
+- Medical Genetics (for genetic disorders)
+- Nephrology (for kidney disease, dialysis)
+- Neurology (for seizures, stroke, headaches, neurological conditions)
+- Neurosurgery (for brain/spine surgery, tumors, aneurysms)
+- Obstetrics (for pregnancy, labor, prenatal care)
+- Oncology (for cancer, tumors)
+- Ophthalmology (for eye conditions, vision problems)
+- Orthopedic Surgery (for bones, joints, fractures, sports injuries)
+- Otolaryngology (ENT) (for ear, nose, throat, sinus)
+- Pathology (for lab tests, disease diagnosis)
+- Pediatrics (for children and infants)
+- Physical Medicine and Rehabilitation (for recovery, physiotherapy)
+- Plastic Surgery (for reconstructive or cosmetic surgery)
+- Psychiatry (for mental health, depression, anxiety)
+- Pulmonology (for lungs, breathing, asthma, COPD)
+- Radiology (for imaging, X-rays, MRI)
+- Rheumatology (for joints, autoimmune, arthritis)
+- General Surgery (for surgical procedures)
+- Thoracic Surgery (for chest/lung surgery)
+- Urology (for kidneys, bladder, urinary tract)
+- Vascular Surgery (for blood vessel conditions)
+- General Medicine (for conditions not fitting the above)
 
-**IMPORTANT:** Return the specialty name EXACTLY as listed above. Do not use variations like "Neurosurgeon" or "Cardiologist".
+**IMPORTANT:** Return the specialty name EXACTLY as listed above.
 
 **IMPORTANT:** Never diagnose. Only provide routing guidance."""
 
@@ -98,14 +124,8 @@ Be thorough, accurate, and prioritize patient safety."""
         full_prompt = f"{system_prompt}\n\n{user_message}"
         
         try:
-            # Make a traced Gemini call using async wrapper for non-blocking execution
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-3.5-flash",
-                contents=full_prompt,
-            )
-            
-            result_str = response.text
+            # Model fallback chain: 2.5-flash -> 2.0-flash -> 2.0-flash-lite -> 1.5-flash
+            result_str = await generate_with_fallback(self.client, full_prompt)
             
             # Parse JSON from response
             json_start = result_str.find('{')
@@ -128,8 +148,92 @@ Be thorough, accurate, and prioritize patient safety."""
             actions = ["Consult a general physician"]
             warnings = [f"AI analysis bypassed/failed: {str(e)}"]
 
+            # Gynecology / Obstetrics
+            if any(k in symptom_lower for k in ["pregnant", "pregnancy", "gynec", "menstrual", "menstruation", "period", "uterus", "ovary", "pcos", "vaginal", "cervical", "reproductive", "fertility", "miscarriage", "labour", "labor", "prenatal", "antenatal"]):
+                specialty = "Gynecology"
+                urgency_level = "critical" if "pregnant" in symptom_lower and any(k in symptom_lower for k in ["pain", "bleeding", "cramp"]) else "moderate"
+                urgency_score = 0.9 if urgency_level == "critical" else 0.8
+                reasons = ["Symptoms indicate gynaecological or obstetric concern"]
+                actions = ["Rest and avoid strenuous activity", "Contact your OB/GYN immediately if pain is severe"]
+                warnings = ["Severe pain or bleeding during pregnancy requires emergency care."] if "pregnant" in symptom_lower else []
+            
+            # Psychiatry
+            elif any(k in symptom_lower for k in ["depression", "anxiety", "mental", "suicidal", "panic", "hallucination", "schizophrenia", "bipolar", "ocd", "ptsd", "phobia", "stress disorder"]):
+                specialty = "Psychiatry"
+                urgency_level = "critical" if any(k in symptom_lower for k in ["suicidal", "self-harm", "overdose"]) else "moderate"
+                urgency_score = 0.95 if urgency_level == "critical" else 0.8
+                reasons = ["Mental health symptoms detected"]
+                actions = ["Speak to a trusted person", "Call a mental health helpline if in crisis"]
+                warnings = ["If you are having thoughts of self-harm, please call emergency services immediately."] if urgency_level == "critical" else []
+
+            # Pediatrics
+            elif any(k in symptom_lower for k in ["child", "infant", "baby", "toddler", "newborn", "pediatric", "kid"]):
+                specialty = "Pediatrics"
+                urgency_level = "moderate"
+                urgency_score = 0.8
+                reasons = ["Pediatric patient symptoms detected"]
+                actions = ["Monitor child's temperature and hydration", "Consult a paediatrician"]
+
+            # Urology
+            elif any(k in symptom_lower for k in ["urine", "urinary", "kidney stone", "bladder", "prostate", "uti", "urethra", "burning urination"]):
+                specialty = "Urology"
+                urgency_level = "moderate"
+                urgency_score = 0.85
+                reasons = ["Urinary or urological symptoms detected"]
+                actions = ["Increase water intake", "Avoid holding urine"]
+
+            # Endocrinology
+            elif any(k in symptom_lower for k in ["diabetes", "thyroid", "hormonal", "insulin", "blood sugar", "hypoglycemia", "hyperglycemia", "hyperthyroid", "hypothyroid", "adrenal"]):
+                specialty = "Endocrinology"
+                urgency_level = "moderate"
+                urgency_score = 0.8
+                reasons = ["Endocrine or metabolic symptoms detected"]
+                actions = ["Monitor blood sugar levels if diabetic", "Take prescribed medications on schedule"]
+
+            # ENT
+            elif any(k in symptom_lower for k in ["ear", "hearing", "nose", "sinus", "throat", "tonsil", "nasal", "snoring", "voice", "larynx", "ent"]):
+                specialty = "Otolaryngology (ENT)"
+                urgency_level = "mild"
+                urgency_score = 0.75
+                reasons = ["Ear, nose, or throat symptoms detected"]
+                actions = ["Avoid cold fluids", "Use steam inhalation for sinus relief"]
+
+            # Oncology
+            elif any(k in symptom_lower for k in ["cancer", "tumor", "lump", "mass", "biopsy", "malignant", "chemotherapy", "oncology"]):
+                specialty = "Oncology"
+                urgency_level = "critical"
+                urgency_score = 0.95
+                reasons = ["Potential oncological symptoms detected"]
+                actions = ["Schedule an urgent appointment with an oncologist"]
+                warnings = ["Do not delay — early cancer detection significantly improves outcomes."]
+
+            # Rheumatology
+            elif any(k in symptom_lower for k in ["arthritis", "lupus", "autoimmune", "rheumatoid", "gout", "inflamed joint", "rheumatology"]):
+                specialty = "Rheumatology"
+                urgency_level = "moderate"
+                urgency_score = 0.8
+                reasons = ["Autoimmune or rheumatological symptoms detected"]
+                actions = ["Rest the affected joints", "Apply warm/cold compress"]
+
+            # Nephrology
+            elif any(k in symptom_lower for k in ["kidney", "renal", "dialysis", "creatinine", "nephritis", "nephrotic"]):
+                specialty = "Nephrology"
+                urgency_level = "moderate"
+                urgency_score = 0.85
+                reasons = ["Kidney or renal symptoms detected"]
+                actions = ["Limit protein intake", "Monitor fluid intake and output"]
+
+            # Allergy
+            elif any(k in symptom_lower for k in ["allergy", "allergic", "hives", "anaphylaxis", "allergic reaction", "food allergy", "immunology"]):
+                specialty = "Allergy and Immunology"
+                urgency_level = "critical" if "anaphylaxis" in symptom_lower else "moderate"
+                urgency_score = 0.9 if "anaphylaxis" in symptom_lower else 0.8
+                reasons = ["Allergic or immune reaction detected"]
+                actions = ["Identify and avoid the allergen", "Take antihistamines if prescribed"]
+                warnings = ["Anaphylaxis is life-threatening — use epinephrine auto-injector if available."] if "anaphylaxis" in symptom_lower else []
+
             # Cardiology rules
-            if any(k in symptom_lower for k in ["heart", "chest pain", "cardiac", "palpitation", "angina", "chest pressure"]):
+            elif any(k in symptom_lower for k in ["heart", "chest pain", "cardiac", "palpitation", "angina", "chest pressure"]):
                 specialty = "Cardiology"
                 urgency_level = "critical"
                 urgency_score = 0.95
@@ -147,7 +251,7 @@ Be thorough, accurate, and prioritize patient safety."""
             
             # Orthopedics rules
             elif any(k in symptom_lower for k in ["bone", "joint", "fracture", "spine", "back pain", "knee", "shoulder", "sprain"]):
-                specialty = "Orthopedics"
+                specialty = "Orthopedic Surgery"
                 urgency_level = "moderate"
                 urgency_score = 0.85
                 reasons = ["Symptoms suggest bone or joint issues"]

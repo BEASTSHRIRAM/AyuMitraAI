@@ -124,37 +124,75 @@ const Login = () => {
               
               <Select onValueChange={(val) => {
                 const specialtyMap = {
-                  cardiology: { email: 'rajesh.sharma@apollo.demo', name: 'Dr. Rajesh Sharma' },
-                  neurology: { email: 'suresh.nair@apollo.demo', name: 'Dr. Suresh Nair' },
-                  general: { email: 'priya.menon@healthfirst.demo', name: 'Dr. Priya Menon' },
-                  orthopedics: { email: 'vikram.singh@apollo.demo', name: 'Dr. Vikram Singh' },
-                  gastro: { email: 'ramesh.gupta@apollo.demo', name: 'Dr. Ramesh Gupta' },
-                  pulmonology: { email: 'deepa.varma@apollo.demo', name: 'Dr. Deepa Varma' },
-                  dermatology: { email: 'nisha.kapoor@apollo.demo', name: 'Dr. Nisha Kapoor' },
-                  ophthalmology: { email: 'lalitha.rao@apollo.demo', name: 'Dr. Lalitha Rao' },
-                  emergency: { email: 'kiran.bhat@apollo.demo', name: 'Dr. Kiran Bhat' }
+                  cardiology:      { email: 'rajesh.sharma@apollo.demo',       name: 'Dr. Rajesh Sharma' },
+                  neurology:       { email: 'suresh.nair@apollo.demo',          name: 'Dr. Suresh Nair' },
+                  general:         { email: 'priya.menon@healthfirst.demo',     name: 'Dr. Priya Menon' },
+                  orthopedics:     { email: 'vikram.singh@apollo.demo',         name: 'Dr. Vikram Singh' },
+                  gastro:          { email: 'ramesh.gupta@apollo.demo',         name: 'Dr. Ramesh Gupta' },
+                  pulmonology:     { email: 'deepa.varma@apollo.demo',          name: 'Dr. Deepa Varma' },
+                  dermatology:     { email: 'nisha.kapoor@apollo.demo',         name: 'Dr. Nisha Kapoor' },
+                  ophthalmology:   { email: 'lalitha.rao@apollo.demo',          name: 'Dr. Lalitha Rao' },
+                  emergency:       { email: 'kiran.bhat@apollo.demo',           name: 'Dr. Kiran Bhat' },
+                  gynecology:      { email: 'ananya.krishnan@medcare.demo',     name: 'Dr. Ananya Krishnan' },
+                  obstetrics:      { email: 'meera.pillai@medcare.demo',        name: 'Dr. Meera Pillai' },
+                  pediatrics:      { email: 'arjun.reddy@apollo.demo',          name: 'Dr. Arjun Reddy' },
+                  internal:        { email: 'kavitha.iyer@apollo.demo',         name: 'Dr. Kavitha Iyer' },
+                  psychiatry:      { email: 'pooja.nambiar@medcare.demo',       name: 'Dr. Pooja Nambiar' },
+                  urology:         { email: 'harish.shetty@apollo.demo',        name: 'Dr. Harish Shetty' },
+                  oncology:        { email: 'smitha.george@cancercare.demo',    name: 'Dr. Smitha George' },
+                  endocrinology:   { email: 'ravi.teja@apollo.demo',            name: 'Dr. Ravi Teja' },
+                  rheumatology:    { email: 'supriya.bose@apollo.demo',         name: 'Dr. Supriya Bose' },
+                  nephrology:      { email: 'aditya.menon@apollo.demo',         name: 'Dr. Aditya Menon' },
+                  hematology:      { email: 'lakshmi.rajan@apollo.demo',        name: 'Dr. Lakshmi Rajan' },
+                  infectious:      { email: 'mohan.pillai@apollo.demo',         name: 'Dr. Mohan Pillai' },
+                  radiology:       { email: 'girish.nair@apollo.demo',          name: 'Dr. Girish Nair' },
+                  neurosurgery:    { email: 'vinod.kumar@apollo.demo',           name: 'Dr. Vinod Kumar' },
+                  ent:             { email: 'balaji.venkat@apollo.demo',         name: 'Dr. Balaji Venkat' },
+                  allergy:         { email: 'prathima.reddy@apollo.demo',       name: 'Dr. Prathima Reddy' },
+                  geriatrics:      { email: 'krishnadev.nair@apollo.demo',      name: 'Dr. Krishnadev Nair' },
+                  family:          { email: 'sriram.kulkarni@medcare.demo',     name: 'Dr. Sriram Kulkarni' },
+                  surgery:         { email: 'nikhil.verma@surgery.demo',        name: 'Dr. Nikhil Verma' },
                 };
                 const doc = specialtyMap[val];
                 if (doc) {
                   setSelectedRole('doctor');
                   setEmail(doc.email);
                   setPassword('AyuMitra123');
-                  toast.success(`${doc.name} (${val}) loaded!`);
+                  toast.success(`${doc.name} loaded!`);
                 }
               }}>
                 <SelectTrigger className="w-full rounded-full text-xs border-teal-600/30 dark:border-teal-400/30 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/20 h-9 px-3">
-                  <SelectValue placeholder="Doctor Specialty" />
+                  <SelectValue placeholder="Demo Doctor" />
                 </SelectTrigger>
-                <SelectContent className="max-h-[200px] overflow-y-auto">
+                <SelectContent className="max-h-[240px] overflow-y-auto">
                   <SelectItem value="cardiology">Cardiology</SelectItem>
                   <SelectItem value="neurology">Neurology</SelectItem>
+                  <SelectItem value="neurosurgery">Neurosurgery</SelectItem>
                   <SelectItem value="general">General Medicine</SelectItem>
-                  <SelectItem value="orthopedics">Orthopedics</SelectItem>
+                  <SelectItem value="family">Family Medicine</SelectItem>
+                  <SelectItem value="internal">Internal Medicine</SelectItem>
+                  <SelectItem value="orthopedics">Orthopedic Surgery</SelectItem>
                   <SelectItem value="gastro">Gastroenterology</SelectItem>
                   <SelectItem value="pulmonology">Pulmonology</SelectItem>
                   <SelectItem value="dermatology">Dermatology</SelectItem>
                   <SelectItem value="ophthalmology">Ophthalmology</SelectItem>
                   <SelectItem value="emergency">Emergency Medicine</SelectItem>
+                  <SelectItem value="gynecology">Gynecology</SelectItem>
+                  <SelectItem value="obstetrics">Obstetrics</SelectItem>
+                  <SelectItem value="pediatrics">Pediatrics</SelectItem>
+                  <SelectItem value="psychiatry">Psychiatry</SelectItem>
+                  <SelectItem value="urology">Urology</SelectItem>
+                  <SelectItem value="endocrinology">Endocrinology</SelectItem>
+                  <SelectItem value="ent">ENT</SelectItem>
+                  <SelectItem value="oncology">Oncology</SelectItem>
+                  <SelectItem value="rheumatology">Rheumatology</SelectItem>
+                  <SelectItem value="nephrology">Nephrology</SelectItem>
+                  <SelectItem value="hematology">Hematology</SelectItem>
+                  <SelectItem value="infectious">Infectious Disease</SelectItem>
+                  <SelectItem value="allergy">Allergy & Immunology</SelectItem>
+                  <SelectItem value="geriatrics">Geriatrics</SelectItem>
+                  <SelectItem value="radiology">Radiology</SelectItem>
+                  <SelectItem value="surgery">General Surgery</SelectItem>
                 </SelectContent>
               </Select>
             </div>

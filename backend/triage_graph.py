@@ -22,6 +22,7 @@ from langgraph.graph import END, StateGraph
 from langsmith import traceable
 
 sys.path.append(os.path.dirname(__file__))
+from model_utils import generate_with_fallback
 from config import get_settings
 from doctor_scraper import DoctorScraper
 from gemini_service import GeminiSymptomAnalyzer
@@ -116,12 +117,8 @@ Doctors found:
 Patient location: {state.get("location") or "Not provided"}
 """
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
-                model="gemini-3.5-flash",
-                contents=prompt,
-            )
-            return {"report": response.text}
+            report_text = await generate_with_fallback(self.client, prompt)
+            return {"report": report_text}
         except Exception as exc:
             logger.error("Report agent failed: %s", exc)
             actions = "\n".join(f"- {a}" for a in analysis.get("recommended_actions", []))

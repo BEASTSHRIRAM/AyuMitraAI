@@ -95,7 +95,8 @@ async def register(request: Request, user: UserCreate):
 @limiter.limit("5/minute")
 async def login(request: Request, credentials: UserLogin):
     user = await db.users.find_one({"email": credentials.email})
-    if not user or not verify_password(credentials.password, user["password"]):
+    stored_hash = user.get("password_hash") or user.get("password") if user else None
+    if not user or not stored_hash or not verify_password(credentials.password, stored_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     token = create_access_token({"sub": user["user_id"], "email": user["email"], "role": user["role"]})
@@ -194,6 +195,9 @@ async def connect_with_doctor(request: SymptomAnalysisRequest):
             "urgency_level": urgency.level,
             "urgency_score": urgency.score,
             "primary_specialty": analysis["primary_specialty"],
+            "recommended_actions": analysis.get("recommended_actions", []),
+            "critical_warnings": analysis.get("critical_warnings", []),
+            "key_symptoms": analysis.get("key_symptoms", []),
             "requested_at": datetime.now(timezone.utc).isoformat(),
 
             "status": "pending",
@@ -282,7 +286,12 @@ async def get_request_status(request_id: str):
         "request_id": request_id,
         "status": request_doc.get("status"),
         "urgency_level": request_doc.get("urgency_level"),
+        "urgency_score": request_doc.get("urgency_score"),
         "symptoms": request_doc.get("symptoms"),
+        "primary_specialty": request_doc.get("primary_specialty"),
+        "recommended_actions": request_doc.get("recommended_actions", []),
+        "critical_warnings": request_doc.get("critical_warnings", []),
+        "key_symptoms": request_doc.get("key_symptoms", []),
         "assigned_doctor": assigned_doctor,
         "matching_doctors_count": len(request_doc.get("matched_doctors", [])),
         "requested_at": request_doc.get("requested_at"),
@@ -437,16 +446,41 @@ async def find_matching_doctors(specialty: str, urgency: str) -> list:
     
     # Map specialties to keywords for flexible matching
     specialty_keywords = {
-        "neurosurgery": ["neurosurgery", "neurosurgeon", "brain surgery", "neuro"],
-        "neurology": ["neurology", "neurologist", "neuro"],
-        "cardiology": ["cardiology", "cardiologist", "heart", "cardiac"],
-        "orthopedics": ["orthopedics", "orthopaedics", "orthopedic", "orthopaedic", "bone", "joint", "fracture", "surgeon"],
-        "gastroenterology": ["gastroenterology", "gastroenterologist", "gastro", "digestive"],
-        "pulmonology": ["pulmonology", "pulmonologist", "lung", "respiratory"],
-        "dermatology": ["dermatology", "dermatologist", "skin"],
-        "ophthalmology": ["ophthalmology", "ophthalmologist", "eye"],
-        "general medicine": ["general", "medicine", "physician", "gp", "family"],
-        "emergency medicine": ["emergency", "trauma", "critical"]
+        "neurosurgery":                         ["neurosurgery", "neurosurgeon", "brain surgery", "neuro"],
+        "neurology":                            ["neurology", "neurologist", "neuro", "neurological"],
+        "cardiology":                           ["cardiology", "cardiologist", "heart", "cardiac"],
+        "orthopedic surgery":                   ["orthopedic", "orthopaedic", "bone", "joint", "fracture", "sports"],
+        "gastroenterology":                     ["gastroenterology", "gastroenterologist", "gastro", "digestive"],
+        "pulmonology":                          ["pulmonology", "pulmonologist", "lung", "respiratory"],
+        "dermatology":                          ["dermatology", "dermatologist", "skin"],
+        "ophthalmology":                        ["ophthalmology", "ophthalmologist", "eye"],
+        "gynecology":                           ["gynecology", "gynaecology", "gynecologist", "gynaecologist", "women", "womens health"],
+        "obstetrics":                           ["obstetrics", "obstetrician", "prenatal", "antenatal", "pregnancy", "maternity"],
+        "pediatrics":                           ["pediatrics", "paediatrics", "pediatrician", "paediatrician", "child", "infant"],
+        "psychiatry":                           ["psychiatry", "psychiatrist", "mental health", "psychology", "counselling"],
+        "urology":                              ["urology", "urologist", "urinary", "bladder", "prostate"],
+        "endocrinology":                        ["endocrinology", "endocrinologist", "diabetes", "thyroid", "hormonal"],
+        "otolaryngology (ent)":                 ["ent", "otolaryngology", "otolaryngologist", "ear", "nose", "throat", "sinus"],
+        "oncology":                             ["oncology", "oncologist", "cancer", "tumor", "tumour"],
+        "rheumatology":                         ["rheumatology", "rheumatologist", "arthritis", "autoimmune", "rheumatic"],
+        "nephrology":                           ["nephrology", "nephrologist", "kidney", "renal", "dialysis"],
+        "hematology":                           ["hematology", "haematology", "hematologist", "blood", "anemia"],
+        "infectious disease":                   ["infectious", "infectiologist", "infection", "fever", "tropical"],
+        "allergy and immunology":               ["allergy", "allergist", "immunology", "immunologist", "immune"],
+        "geriatrics":                           ["geriatrics", "geriatrician", "elderly", "senior", "gerontology"],
+        "internal medicine":                    ["internal medicine", "internist"],
+        "family medicine":                      ["family medicine", "family doctor", "family physician"],
+        "general surgery":                      ["general surgery", "general surgeon", "surgical"],
+        "thoracic surgery":                     ["thoracic", "chest surgery", "thoracic surgeon"],
+        "vascular surgery":                     ["vascular", "blood vessel", "vascular surgeon"],
+        "plastic surgery":                      ["plastic surgery", "plastic surgeon", "cosmetic", "reconstructive"],
+        "physical medicine and rehabilitation": ["rehabilitation", "physio", "physiotherapy", "rehab", "physiatrist"],
+        "anesthesiology":                       ["anesthesiology", "anaesthesiology", "anesthesiologist", "anesthesia"],
+        "radiology":                            ["radiology", "radiologist", "imaging", "x-ray", "mri"],
+        "pathology":                            ["pathology", "pathologist", "lab", "biopsy"],
+        "medical genetics":                     ["genetics", "geneticist", "genetic disorder"],
+        "general medicine":                     ["general", "medicine", "physician", "gp", "family", "general practitioner"],
+        "emergency medicine":                   ["emergency", "trauma", "critical", "er", "casualty"],
     }
     
     # Normalize the AI-returned specialty
@@ -842,7 +876,9 @@ async def get_doctor_profile(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can access this endpoint")
     
-    doctor = await db.doctors.find_one({"doctor_id": current_user["sub"]}, {"_id": 0})
+    doctor = await db.doctors.find_one({
+        "$or": [{"user_id": current_user["sub"]}, {"doctor_id": current_user["sub"]}]
+    }, {"_id": 0})
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor profile not found")
     
@@ -853,6 +889,12 @@ async def update_doctor_availability(availability: UpdateDoctorAvailability, cur
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can update availability")
     
+    doctor = await db.doctors.find_one({
+        "$or": [{"user_id": current_user["sub"]}, {"doctor_id": current_user["sub"]}]
+    })
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+        
     update_data = {}
     if availability.is_online is not None:
         update_data["availability.is_online"] = availability.is_online
@@ -860,11 +902,11 @@ async def update_doctor_availability(availability: UpdateDoctorAvailability, cur
         update_data["availability.time_slots"] = [slot.model_dump() for slot in availability.time_slots]
     
     result = await db.doctors.update_one(
-        {"doctor_id": current_user["sub"]},
+        {"doctor_id": doctor["doctor_id"]},
         {"$set": update_data}
     )
     
-    if result.modified_count == 0:
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Doctor not found")
     
     return {"message": "Availability updated successfully"}
@@ -874,9 +916,15 @@ async def get_doctor_requests(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can access this endpoint")
     
+    doctor = await db.doctors.find_one({
+        "$or": [{"user_id": current_user["sub"]}, {"doctor_id": current_user["sub"]}]
+    })
+    if not doctor:
+        return []
+        
     # Find requests where this doctor is in the matched_doctors array
     requests = await db.patient_requests.find(
-        {"matched_doctors": current_user["sub"]},
+        {"matched_doctors": doctor["doctor_id"]},
         {"_id": 0}
     ).sort("requested_at", -1).to_list(100)
     
@@ -887,12 +935,14 @@ async def get_doctor_stats(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can access this endpoint")
     
-    doctor = await db.doctors.find_one({"doctor_id": current_user["sub"]})
+    doctor = await db.doctors.find_one({
+        "$or": [{"user_id": current_user["sub"]}, {"doctor_id": current_user["sub"]}]
+    })
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
     
-    total_requests = await db.patient_requests.count_documents({"matched_doctors": current_user["sub"]})
-    pending_requests = await db.patient_requests.count_documents({"matched_doctors": current_user["sub"], "status": "pending"})
+    total_requests = await db.patient_requests.count_documents({"matched_doctors": doctor["doctor_id"]})
+    pending_requests = await db.patient_requests.count_documents({"matched_doctors": doctor["doctor_id"], "status": "pending"})
     
     return DoctorStats(
         total_requests=total_requests,
@@ -906,21 +956,24 @@ async def accept_patient_request(request_id: str, current_user: dict = Depends(g
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can accept requests")
     
+    doctor = await db.doctors.find_one({
+        "$or": [{"user_id": current_user["sub"]}, {"doctor_id": current_user["sub"]}]
+    })
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+        
     # Verify doctor is in matched_doctors list
     request_doc = await db.patient_requests.find_one({"request_id": request_id})
-    if not request_doc or current_user["sub"] not in request_doc.get("matched_doctors", []):
+    if not request_doc or doctor["doctor_id"] not in request_doc.get("matched_doctors", []):
         raise HTTPException(status_code=404, detail="Request not found or not assigned to you")
     
     result = await db.patient_requests.update_one(
         {"request_id": request_id},
-        {"$set": {"status": "accepted", "assigned_doctor_id": current_user["sub"]}}
+        {"$set": {"status": "accepted", "assigned_doctor_id": doctor["doctor_id"]}}
     )
     
-    if result.modified_count == 0:
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Request not found")
-    
-    # Get doctor info
-    doctor = await db.doctors.find_one({"doctor_id": current_user["sub"]})
     
     return {
         "message": "Request accepted",
@@ -935,8 +988,14 @@ async def reject_patient_request(request_id: str, current_user: dict = Depends(g
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can reject requests")
     
+    doctor = await db.doctors.find_one({
+        "$or": [{"user_id": current_user["sub"]}, {"doctor_id": current_user["sub"]}]
+    })
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+        
     request_doc = await db.patient_requests.find_one({"request_id": request_id})
-    if not request_doc or current_user["sub"] not in request_doc.get("matched_doctors", []):
+    if not request_doc or doctor["doctor_id"] not in request_doc.get("matched_doctors", []):
         raise HTTPException(status_code=404, detail="Request not found or not assigned to you")
     
     result = await db.patient_requests.update_one(
@@ -944,7 +1003,7 @@ async def reject_patient_request(request_id: str, current_user: dict = Depends(g
         {"$set": {"status": "rejected"}}
     )
     
-    if result.modified_count == 0:
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Request not found")
         
     return {"message": "Request rejected successfully"}
@@ -954,9 +1013,15 @@ async def complete_patient_request(request_id: str, body: dict = None, current_u
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can complete requests")
     
+    doctor = await db.doctors.find_one({
+        "$or": [{"user_id": current_user["sub"]}, {"doctor_id": current_user["sub"]}]
+    })
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+        
     # Verify doctor is assigned to this request
     request_doc = await db.patient_requests.find_one({"request_id": request_id})
-    if not request_doc or request_doc.get("assigned_doctor_id") != current_user["sub"]:
+    if not request_doc or request_doc.get("assigned_doctor_id") != doctor["doctor_id"]:
         raise HTTPException(status_code=404, detail="Request not found or not assigned to you")
     
     # Get bill breakdown from request body
@@ -975,15 +1040,14 @@ async def complete_patient_request(request_id: str, body: dict = None, current_u
         raise HTTPException(status_code=404, detail="Request not found")
     
     await db.doctors.update_one(
-        {"doctor_id": current_user["sub"]},
+        {"doctor_id": doctor["doctor_id"]},
         {"$inc": {"patients_treated": 1}}
     )
 
     # Automatically generate prescription from doctor inputs
     if bill_breakdown:
-        doctor_doc = await db.doctors.find_one({"doctor_id": current_user["sub"]})
-        doctor_name = doctor_doc.get("full_name", "Doctor") if doctor_doc else "Doctor"
-        doctor_specialty = doctor_doc.get("specialization", "") if doctor_doc else ""
+        doctor_name = doctor.get("full_name", "Doctor")
+        doctor_specialty = doctor.get("specialization", "")
 
         prescription_id = str(uuid.uuid4())
         medications = bill_breakdown.get("medications", [])
@@ -1362,6 +1426,9 @@ async def connect_with_doctor_stream(request_data: SymptomAnalysisRequest):
             "urgency_level": urgency,
             "urgency_score": urgency_score,
             "primary_specialty": detected_specialty,
+            "recommended_actions": analysis.get("recommended_actions", []),
+            "critical_warnings": analysis.get("critical_warnings", []),
+            "key_symptoms": analysis.get("key_symptoms", []),
             "requested_at": datetime.now(timezone.utc).isoformat(),
             "status": "pending",
             "matched_doctors": [doc["doctor_id"] for doc in matching_doctors],
@@ -1389,6 +1456,8 @@ async def connect_with_doctor_stream(request_data: SymptomAnalysisRequest):
             "primary_specialty": detected_specialty,
             "urgency_level": urgency,
             "urgency_score": urgency_score,
+            "recommended_actions": analysis.get("recommended_actions", []),
+            "critical_warnings": analysis.get("critical_warnings", []),
             "matching_doctors": [
                 {
                     "doctor_id": doc["doctor_id"],

@@ -37,6 +37,7 @@ const PatientDashboard = () => {
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [totalAmount, setTotalAmount] = useState(550);
   const [billBreakdown, setBillBreakdown] = useState(null);
+  const [triageGuidance, setTriageGuidance] = useState(null); // { actions, warnings, urgency_level, specialty }
   const pollIntervalRef = useRef(null);
 
   // Web search state
@@ -159,7 +160,7 @@ const PatientDashboard = () => {
     setAgentTraceKey(k => k + 1);
   };
 
-  const handleAgentTraceDone = ({ request_id, matching_doctors, primary_specialty, urgency_level, urgency_score }) => {
+  const handleAgentTraceDone = ({ request_id, matching_doctors, primary_specialty, urgency_level, urgency_score, recommended_actions, critical_warnings }) => {
     const doctors = matching_doctors || [];
     if (doctors.length === 0) {
       toast.error('No doctors available at the moment.');
@@ -172,7 +173,16 @@ const PatientDashboard = () => {
     setMatchedDoctors(doctors);
     setRequestStatus('pending');
     setShowAgentTrace(false);
-    toast.success(`✅ Found ${doctors.length} matching doctor${doctors.length !== 1 ? 's' : ''}!`);
+    // Store triage guidance from the SSE stream result
+    if (recommended_actions || critical_warnings) {
+      setTriageGuidance({
+        actions: recommended_actions || [],
+        warnings: critical_warnings || [],
+        urgency_level: urgency_level || 'moderate',
+        specialty: primary_specialty || 'General Medicine',
+      });
+    }
+    toast.success(`Found ${doctors.length} matching doctor${doctors.length !== 1 ? 's' : ''}!`);
     startPolling(request_id);
   };
 
@@ -188,6 +198,16 @@ const PatientDashboard = () => {
         
         setRequestStatus(data.status);
         
+        // Capture triage guidance from polling if not already set
+        if (!triageGuidance && (data.recommended_actions?.length || data.critical_warnings?.length)) {
+          setTriageGuidance({
+            actions: data.recommended_actions || [],
+            warnings: data.critical_warnings || [],
+            urgency_level: data.urgency_level || 'moderate',
+            specialty: data.primary_specialty || 'General Medicine',
+          });
+        }
+
         if (data.status === 'accepted' && data.assigned_doctor) {
           setAssignedDoctor(data.assigned_doctor);
           if (!assignedDoctor) {
@@ -795,6 +815,61 @@ const PatientDashboard = () => {
                         <Navigation className="w-4 h-4 mr-2" />
                         Get Directions
                       </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* While You Wait — First-Aid Guidance */}
+                {!showPayment && triageGuidance && (triageGuidance.actions.length > 0 || triageGuidance.warnings.length > 0) && (
+                  <Card className={`border-2 ${
+                    triageGuidance.urgency_level === 'critical'
+                      ? 'border-red-400 bg-red-50 dark:bg-red-950/30'
+                      : triageGuidance.urgency_level === 'moderate'
+                      ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30'
+                      : 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30'
+                  }`}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className={`text-base flex items-center gap-2 ${
+                        triageGuidance.urgency_level === 'critical' ? 'text-red-700 dark:text-red-300'
+                        : triageGuidance.urgency_level === 'moderate' ? 'text-amber-700 dark:text-amber-300'
+                        : 'text-emerald-700 dark:text-emerald-300'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full inline-block ${
+                          triageGuidance.urgency_level === 'critical' ? 'bg-red-500 animate-pulse'
+                          : triageGuidance.urgency_level === 'moderate' ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                        }`} />
+                        While You Wait — {triageGuidance.specialty}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {triageGuidance.warnings.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">Important Warnings</p>
+                          {triageGuidance.warnings.map((w, i) => (
+                            <div key={i} className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
+                              <span className="mt-0.5 flex-shrink-0 text-red-500">!</span>
+                              <span>{w}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {triageGuidance.actions.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Recommended Steps</p>
+                          {triageGuidance.actions.map((action, i) => (
+                            <div key={i} className="flex items-start gap-2 text-sm">
+                              <span className={`mt-1 w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold ${
+                                triageGuidance.urgency_level === 'critical' ? 'bg-red-500'
+                                : triageGuidance.urgency_level === 'moderate' ? 'bg-amber-500'
+                                : 'bg-emerald-500'
+                              }`}>{i + 1}</span>
+                              <span className="text-slate-700 dark:text-slate-300">{action}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-slate-400 mt-2 border-t pt-2">This is AI-generated guidance only. Follow your doctor's advice.</p>
                     </CardContent>
                   </Card>
                 )}

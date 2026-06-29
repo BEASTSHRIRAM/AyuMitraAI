@@ -32,9 +32,6 @@ const Navbar = () => {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/copilot" data-testid="copilot-link">
-              <Button variant="ghost" size="sm">Health Copilot</Button>
-            </Link>
             {isAuthenticated() ? (
               <>
                 {user?.role === 'doctor' && (
@@ -53,12 +50,17 @@ const Navbar = () => {
                   </Link>
                 )}
                 {user?.role === 'patient' && (
-                  <Link to="/consultations" data-testid="consultations-link">
-                    <Button variant="ghost" size="sm">
-                      <FileText className="w-4 h-4 mr-1" />
-                      Consultations
-                    </Button>
-                  </Link>
+                  <>
+                    <Link to="/dashboard" data-testid="dashboard-link">
+                      <Button variant="ghost" size="sm">Dashboard</Button>
+                    </Link>
+                    <Link to="/consultations" data-testid="consultations-link">
+                      <Button variant="ghost" size="sm">
+                        <FileText className="w-4 h-4 mr-1" />
+                        Consultations
+                      </Button>
+                    </Link>
+                  </>
                 )}
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors duration-500">
                   <User className="w-4 h-4" />
@@ -113,9 +115,6 @@ const Navbar = () => {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-slate-200 dark:border-slate-700 pt-4 space-y-3">
-            <Link to="/copilot" onClick={closeMenu} className="block">
-              <Button variant="ghost" className="w-full justify-start">Health Copilot</Button>
-            </Link>
             {isAuthenticated() ? (
               <>
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
@@ -138,6 +137,19 @@ const Navbar = () => {
                   <Link to="/hospital-registration" onClick={closeMenu} className="block">
                     <Button variant="ghost" className="w-full justify-start">Hospital Management</Button>
                   </Link>
+                )}
+                {user?.role === 'patient' && (
+                  <>
+                    <Link to="/dashboard" onClick={closeMenu} className="block">
+                      <Button variant="ghost" className="w-full justify-start">Dashboard</Button>
+                    </Link>
+                    <Link to="/consultations" onClick={closeMenu} className="block">
+                      <Button variant="ghost" className="w-full justify-start">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Consultations
+                      </Button>
+                    </Link>
+                  </>
                 )}
                 
                 <Button onClick={handleLogout} variant="outline" className="w-full justify-start text-red-600">
