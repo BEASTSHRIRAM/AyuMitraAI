@@ -101,7 +101,7 @@ Be thorough, accurate, and prioritize patient safety."""
             # Make a traced Gemini call using async wrapper for non-blocking execution
             response = await asyncio.to_thread(
                 self.client.models.generate_content,
-                model="gemini-2.0-flash",
+                model="gemini-3.5-flash",
                 contents=full_prompt,
             )
             
