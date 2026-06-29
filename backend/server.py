@@ -33,6 +33,7 @@ client = AsyncIOMotorClient(settings.MONGO_URL)
 db = client[settings.DB_NAME]
 
 app = FastAPI(title="AyuMitraAI API", version="1.0.0")
+# Trigger reload to refresh cached settings from .env
 api_router = APIRouter(prefix="/api")
 
 # Rate limiting for sensitive endpoints
@@ -155,7 +156,7 @@ async def connect_with_doctor(request: SymptomAnalysisRequest):
     try:
         # Create temporary patient ID if not authenticated
         temp_patient_id = f"temp_{uuid.uuid4()}"
-        patient_name = request.patient_name if hasattr(request, 'patient_name') else "Anonymous Patient"
+        patient_name = request.patient_name or "Anonymous Patient"
         
         # Analyze symptoms to get specialty
         analysis = await gemini_analyzer.analyze_symptoms(
@@ -189,8 +190,10 @@ async def connect_with_doctor(request: SymptomAnalysisRequest):
             "patient_age": request.patient_age,
             "symptoms": request.symptom_description,
             "urgency_level": urgency.level,
+            "urgency_score": urgency.score,
             "primary_specialty": analysis["primary_specialty"],
             "requested_at": datetime.now(timezone.utc).isoformat(),
+
             "status": "pending",
             "matched_doctors": [doc["doctor_id"] for doc in matching_doctors],
             "assigned_doctor_id": None
@@ -233,7 +236,6 @@ async def connect_with_doctor(request: SymptomAnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
 
-@api_router.get("/patient/request-status/{request_id}")
 @api_router.get("/patient/request-status/{request_id}")
 async def get_request_status(request_id: str):
     """Get status of patient's doctor connection request - NO AUTH REQUIRED"""
@@ -286,14 +288,28 @@ async def get_request_status(request_id: str):
     }
 
 @api_router.get("/patient/history")
-async def get_patient_history(patient_id: str = None):
-    """Get patient's consultation history - Optional auth"""
-    if not patient_id:
+async def get_patient_history(request: Request, patient_id: str = None):
+    """Get patient's consultation history - with optional auth resolution"""
+    pid = patient_id
+    if not pid:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                from auth import decode_token
+                payload = decode_token(token)
+                pid = payload.get("sub")
+            except Exception:
+                pass
+                
+    if not pid:
         return []
+    
+    print(f"[DEBUG] get_patient_history: pid={pid}")
     
     # Get patient requests
     requests = await db.patient_requests.find(
-        {"patient_id": patient_id},
+        {"patient_id": pid},
         {"_id": 0}
     ).sort("requested_at", -1).limit(50).to_list(50)
     
@@ -323,6 +339,29 @@ async def get_patient_history(patient_id: str = None):
         history.append(item)
     
     return history
+
+@api_router.post("/patient/link-request/{request_id}")
+async def link_request_to_patient(request_id: str, current_user: dict = Depends(get_current_user)):
+    """Link a temporary/anonymous patient request to an authenticated user"""
+    user = await db.users.find_one({"user_id": current_user["sub"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    result = await db.patient_requests.update_one(
+        {"request_id": request_id},
+        {"$set": {
+            "patient_id": current_user["sub"],
+            "patient_name": user.get("full_name") or "Patient"
+        }}
+    )
+    
+    # Also update doctor notifications with user's actual name
+    await db.doctor_notifications.update_many(
+        {"patient_request_id": request_id},
+        {"$set": {"patient_name": user.get("full_name") or "Patient"}}
+    )
+    
+    return {"message": "Request linked successfully"}
 
 @api_router.post("/analyze-symptoms", response_model=SymptomAnalysisResponse)
 async def analyze_symptoms(request: SymptomAnalysisRequest, current_user: dict = Depends(get_current_user)):
@@ -889,7 +928,27 @@ async def accept_patient_request(request_id: str, current_user: dict = Depends(g
         "doctor_phone": doctor.get("phone")
     }
 
+@api_router.post("/doctor/request/{request_id}/reject")
+async def reject_patient_request(request_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "doctor":
+        raise HTTPException(status_code=403, detail="Only doctors can reject requests")
+    
+    request_doc = await db.patient_requests.find_one({"request_id": request_id})
+    if not request_doc or current_user["sub"] not in request_doc.get("matched_doctors", []):
+        raise HTTPException(status_code=404, detail="Request not found or not assigned to you")
+    
+    result = await db.patient_requests.update_one(
+        {"request_id": request_id},
+        {"$set": {"status": "rejected"}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    return {"message": "Request rejected successfully"}
+
 @api_router.post("/doctor/request/{request_id}/complete")
+
 async def complete_patient_request(request_id: str, body: dict = None, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can complete requests")

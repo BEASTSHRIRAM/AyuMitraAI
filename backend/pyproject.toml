@@ -27,6 +27,8 @@ dependencies = [
     "lxml==4.9.3",
     "firecrawl-py==0.0.16",
     "protobuf>=4.25.3",
+    "slowapi==0.1.9",
+    "langgraph==0.2.60",
 ]
 
 [build-system]

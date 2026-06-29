@@ -102,6 +102,65 @@ const Login = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+
+          {/* Quick Demo Login */}
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium text-center">Quick Demo Login</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                className="w-full rounded-full text-xs border-teal-600/30 dark:border-teal-400/30 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/20 h-9"
+                onClick={() => {
+                  setSelectedRole('patient');
+                  setEmail('supriya@gmail.com');
+                  setPassword('supriya123');
+                  toast.success('Patient demo credentials loaded!');
+                }}
+              >
+                Demo Patient
+              </Button>
+              
+              <Select onValueChange={(val) => {
+                const specialtyMap = {
+                  cardiology: { email: 'rajesh.sharma@apollo.demo', name: 'Dr. Rajesh Sharma' },
+                  neurology: { email: 'suresh.nair@apollo.demo', name: 'Dr. Suresh Nair' },
+                  general: { email: 'priya.menon@healthfirst.demo', name: 'Dr. Priya Menon' },
+                  orthopedics: { email: 'vikram.singh@apollo.demo', name: 'Dr. Vikram Singh' },
+                  gastro: { email: 'ramesh.gupta@apollo.demo', name: 'Dr. Ramesh Gupta' },
+                  pulmonology: { email: 'deepa.varma@apollo.demo', name: 'Dr. Deepa Varma' },
+                  dermatology: { email: 'nisha.kapoor@apollo.demo', name: 'Dr. Nisha Kapoor' },
+                  ophthalmology: { email: 'lalitha.rao@apollo.demo', name: 'Dr. Lalitha Rao' },
+                  emergency: { email: 'kiran.bhat@apollo.demo', name: 'Dr. Kiran Bhat' }
+                };
+                const doc = specialtyMap[val];
+                if (doc) {
+                  setSelectedRole('doctor');
+                  setEmail(doc.email);
+                  setPassword('AyuMitra123');
+                  toast.success(`${doc.name} (${val}) loaded!`);
+                }
+              }}>
+                <SelectTrigger className="w-full rounded-full text-xs border-teal-600/30 dark:border-teal-400/30 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/20 h-9 px-3">
+                  <SelectValue placeholder="Doctor Specialty" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[200px] overflow-y-auto">
+                  <SelectItem value="cardiology">Cardiology</SelectItem>
+                  <SelectItem value="neurology">Neurology</SelectItem>
+                  <SelectItem value="general">General Medicine</SelectItem>
+                  <SelectItem value="orthopedics">Orthopedics</SelectItem>
+                  <SelectItem value="gastro">Gastroenterology</SelectItem>
+                  <SelectItem value="pulmonology">Pulmonology</SelectItem>
+                  <SelectItem value="dermatology">Dermatology</SelectItem>
+                  <SelectItem value="ophthalmology">Ophthalmology</SelectItem>
+                  <SelectItem value="emergency">Emergency Medicine</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+
           <p className="text-center mt-4 sm:mt-6 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
             Don't have an account?{' '}
             <Link to="/signup" className="text-teal-600 dark:text-teal-400 font-medium hover:underline">

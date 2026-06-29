@@ -51,6 +51,33 @@ const PatientDashboard = () => {
 
   useEffect(() => {
     loadHistory();
+
+    // Restore active session from localStorage (survives page reload & registration)
+    const savedRequestId = localStorage.getItem('ayumitra_request_id');
+    const savedDoctors = localStorage.getItem('ayumitra_matched_doctors');
+    if (savedRequestId && savedDoctors) {
+      try {
+        const doctors = JSON.parse(savedDoctors);
+        setRequestId(savedRequestId);
+        setMatchedDoctors(doctors);
+        setRequestStatus('pending');
+        startPolling(savedRequestId);
+
+        // Link request if user just logged in/registered
+        const token = localStorage.getItem('ayumitra-token');
+        if (token) {
+          api.post(`/patient/link-request/${savedRequestId}`).then(() => {
+            loadHistory();
+          }).catch(err => {
+            console.error('Failed to link request:', err);
+          });
+        }
+      } catch (e) {
+        localStorage.removeItem('ayumitra_request_id');
+        localStorage.removeItem('ayumitra_matched_doctors');
+      }
+    }
+
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -61,7 +88,7 @@ const PatientDashboard = () => {
   const loadHistory = async () => {
     try {
       // Skip loading history for unauthenticated users
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('ayumitra-token');
       if (!token) {
         setConsultationHistory([]);
         setLoadingHistory(false);
@@ -82,6 +109,9 @@ const PatientDashboard = () => {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
+    // Clear persisted session
+    localStorage.removeItem('ayumitra_request_id');
+    localStorage.removeItem('ayumitra_matched_doctors');
     setSelectedHistory(null);
     setSymptomDescription('');
     setPatientAge('');
@@ -124,12 +154,17 @@ const PatientDashboard = () => {
         return;
       }
       
-      setRequestId(response.data.request_id);
+      const rid = response.data.request_id;
+      // Persist to localStorage so session survives reload & registration redirect
+      localStorage.setItem('ayumitra_request_id', rid);
+      localStorage.setItem('ayumitra_matched_doctors', JSON.stringify(doctors));
+
+      setRequestId(rid);
       setMatchedDoctors(doctors);
       setRequestStatus('pending');
       toast.success(`Found ${doctors.length} matching doctors!`);
       
-      startPolling(response.data.request_id);
+      startPolling(rid);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Connection failed');
     } finally {
@@ -158,6 +193,9 @@ const PatientDashboard = () => {
         
         if (data.status === 'completed') {
           clearInterval(pollIntervalRef.current);
+          // Clear persisted session once completed
+          localStorage.removeItem('ayumitra_request_id');
+          localStorage.removeItem('ayumitra_matched_doctors');
           if (data.bill_breakdown) {
             setBillBreakdown(data.bill_breakdown);
             setTotalAmount(data.bill_breakdown.total);
@@ -191,6 +229,11 @@ const PatientDashboard = () => {
   };
 
   const handlePayment = () => {
+    if (!localStorage.getItem('ayumitra-token')) {
+      toast.info('Please sign up or login to make payments and save your records');
+      window.location.href = '/signup';
+      return;
+    }
     setShowPaymentGateway(true);
   };
 
@@ -230,7 +273,7 @@ const PatientDashboard = () => {
   const handleConnectWebDoctor = async (doctor) => {
     try {
       // Check if user is authenticated
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('ayumitra-token');
       
       if (!token) {
         // Redirect to signup/login page
@@ -240,7 +283,7 @@ const PatientDashboard = () => {
       }
 
       // If authenticated, proceed with connection
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const user = JSON.parse(localStorage.getItem('ayumitra-user') || '{}');
       const patientName = user.full_name || 'Patient';
       const patientPhone = user.phone || '';
 
@@ -536,6 +579,32 @@ const PatientDashboard = () => {
             {/* Active Session */}
             {matchedDoctors && (
               <div className="space-y-4 sm:space-y-6">
+                {/* Account Registration Prompt if not logged in */}
+                {!localStorage.getItem('ayumitra-token') && (
+                  <Card className="border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+                    <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 mt-2 rounded-full bg-amber-500 flex-shrink-0" />
+                        <div>
+                          <h3 className="font-bold text-amber-800 dark:text-amber-200">Registration Required</h3>
+
+                          <p className="text-sm text-amber-700 dark:text-amber-300">
+                            Please register or sign in to finalize your booking, secure your consultation details, and complete payment.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto flex-shrink-0">
+                        <Button onClick={() => window.location.href='/signup'} className="bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-full px-5">
+                          Register
+                        </Button>
+                        <Button onClick={() => window.location.href='/login'} variant="outline" className="border-amber-600 text-amber-700 hover:bg-amber-100 font-semibold rounded-full px-5">
+                          Login
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Payment Card */}
                 {showPayment && (
                   <Card className="border-2 border-teal-500 bg-teal-50 dark:bg-teal-950/30">

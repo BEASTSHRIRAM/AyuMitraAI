@@ -334,7 +334,18 @@ const DoctorDashboard = () => {
     }
   };
 
+  const rejectRequest = async (requestId) => {
+    try {
+      await api.post(`/doctor/request/${requestId}/reject`);
+      toast.success('Request rejected');
+      fetchDoctorData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reject');
+    }
+  };
+
   const handleCompleteWithBill = async (requestId, billBreakdown) => {
+
     try {
       await api.post(`/doctor/request/${requestId}/complete`, { bill_breakdown: billBreakdown });
       toast.success('Consultation completed!');
@@ -475,7 +486,7 @@ const DoctorDashboard = () => {
                             Age: {request.patient_age || 'N/A'}
                           </p>
                         </div>
-                        <UrgencyBadge level={request.urgency_level} />
+                        <UrgencyBadge level={request.urgency_level} score={request.urgency_score} />
                       </div>
                       <div>
                         <p className="text-xs sm:text-sm font-medium mb-1">Symptoms:</p>
@@ -491,10 +502,16 @@ const DoctorDashboard = () => {
                         </Badge>
                         <div className="flex gap-2">
                           {request.status === 'pending' && (
-                            <Button size="sm" onClick={() => acceptRequest(request.request_id)} className="text-xs sm:text-sm">
-                              Accept
-                            </Button>
+                            <>
+                              <Button size="sm" onClick={() => acceptRequest(request.request_id)} className="text-xs sm:text-sm bg-green-600 hover:bg-green-700 text-white">
+                                Accept
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => rejectRequest(request.request_id)} className="text-xs sm:text-sm">
+                                Reject
+                              </Button>
+                            </>
                           )}
+
                           {request.status === 'accepted' && (
                             <Button 
                               size="sm" 

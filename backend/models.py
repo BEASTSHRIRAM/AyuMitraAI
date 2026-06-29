@@ -53,6 +53,7 @@ class SymptomAnalysisRequest(BaseModel):
     symptom_description: str = Field(min_length=10, max_length=2000)
     patient_age: Optional[int] = Field(None, ge=0, le=150)
     patient_location: Optional[dict] = None
+    patient_name: Optional[str] = None
 
 class CopilotTriageRequest(BaseModel):
     symptom_description: str = Field(min_length=10, max_length=2000)
